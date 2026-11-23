@@ -3,192 +3,295 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1f6f5c">
-<title>Clip-Clap Steuerung</title>
+<meta name="theme-color" content="#05090a">
+<title>Clip-Clap Cockpit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f4f5f2; --card: #ffffff; --text: #1c2321; --muted: #66706c;
-    --line: #dde1dd; --accent: #1f6f5c; --accent-soft: #e3f0ec; --on-accent: #ffffff;
-    --on: #1f8a4c; --off: #8a3b2f; --track: #e3e7e4;
+    --bg: #05090a; --glass: rgba(255,255,255,.045); --glass-2: rgba(255,255,255,.08);
+    --edge: rgba(255,255,255,.09); --text: #eef6f3; --muted: #8fa39c; --dim: #4b5d57;
+    --mint: #3ef0b0; --teal: #1fb7a6; --amber: #ffc857; --coral: #ff6b6b; --violet: #8b7bff;
+    --btn: #123b31; --btn-hi: #17493d; --btn-text: #7ff5cc;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #121614; --card: #1c2220; --text: #e8ece9; --muted: #9aa5a0;
-      --line: #2e3633; --accent: #5cc2a5; --accent-soft: #1f3a33; --on-accent: #0d1f1a;
-      --on: #4cc27e; --off: #e07a68; --track: #2a3330; }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-    font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 560px; margin: 0 auto; padding: 16px 16px 48px; }
-  h1 { font-size: 22px; margin: 8px 0 2px; }
-  h2 { font-size: 17px; margin: 0 0 12px; }
-  .sub { color: var(--muted); margin: 0 0 16px; font-size: 15px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-    padding: 16px; margin-bottom: 14px; }
-  button { font: inherit; border: 0; border-radius: 10px; padding: 12px 16px; cursor: pointer;
-    background: var(--accent); color: var(--on-accent); font-weight: 600; min-height: 48px; }
-  button.ghost { background: var(--accent-soft); color: var(--accent); }
-  button.small { min-height: 38px; padding: 6px 12px; font-size: 15px; }
-  button:disabled { opacity: .45; cursor: default; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--bg); }
+  body { margin: 0; color: var(--text); background: var(--bg); min-height: 100vh; overflow-x: hidden;
+    font: 16px/1.45 "Space Grotesk", system-ui, sans-serif; }
+
+  /* Lebendiger Hintergrund */
+  .aurora { position: fixed; inset: -20%; z-index: 0; pointer-events: none; filter: blur(60px); opacity: .55; }
+  .aurora i { position: absolute; border-radius: 50%; animation: drift 22s ease-in-out infinite alternate; }
+  .aurora i:nth-child(1) { width: 60vmax; height: 60vmax; left: -10%; top: -10%; background: radial-gradient(circle, #0f6b55 0%, transparent 65%); }
+  .aurora i:nth-child(2) { width: 50vmax; height: 50vmax; right: -15%; top: 20%; background: radial-gradient(circle, #2b2470 0%, transparent 65%); animation-duration: 28s; }
+  .aurora i:nth-child(3) { width: 45vmax; height: 45vmax; left: 10%; bottom: -20%; background: radial-gradient(circle, #0b4f5c 0%, transparent 65%); animation-duration: 34s; }
+  body.on .aurora i:nth-child(1) { background: radial-gradient(circle, #13a77d 0%, transparent 65%); }
+  @keyframes drift { to { transform: translate(8vw, 6vh) scale(1.15); } }
+  .grain { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .07;
+    background-image: radial-gradient(rgba(255,255,255,.7) 1px, transparent 1px); background-size: 3px 3px; }
+
+  main { position: relative; z-index: 1; max-width: 560px; margin: 0 auto; padding: 18px 16px 60px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin: 6px 2px 18px; }
+  .brand { font-weight: 700; font-size: 20px; letter-spacing: .5px; }
+  .brand small { display: block; font-weight: 500; font-size: 12px; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; }
+  .link { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); }
+  .dot.live { background: var(--mint); box-shadow: 0 0 0 0 rgba(62,240,176,.6); animation: ping 2s infinite; }
+  @keyframes ping { 70% { box-shadow: 0 0 0 10px rgba(62,240,176,0); } 100% { box-shadow: 0 0 0 0 rgba(62,240,176,0); } }
+
+  .card { position: relative; background: var(--glass); border: 1px solid var(--edge); border-radius: 22px;
+    padding: 18px; margin-bottom: 16px; backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    box-shadow: 0 20px 50px -30px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06);
+    animation: rise .7s cubic-bezier(.2,.8,.2,1) both; }
+  .card:nth-of-type(2) { animation-delay: .06s } .card:nth-of-type(3) { animation-delay: .12s }
+  .card:nth-of-type(4) { animation-delay: .18s } .card:nth-of-type(5) { animation-delay: .24s }
+  @keyframes rise { from { opacity: 0; transform: translateY(18px) scale(.98); } }
+  .label { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .grow { flex: 1; }
-  .big { width: 100%; }
-  .state { font-size: 28px; font-weight: 700; }
-  .state.on { color: var(--on); } .state.off { color: var(--off); }
-  .pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 14px; font-weight: 700; }
-  .pill.on { background: color-mix(in srgb, var(--on) 18%, transparent); color: var(--on); }
-  .pill.off { background: color-mix(in srgb, var(--off) 18%, transparent); color: var(--off); }
-  .prog { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
-  .prog:first-child { border-top: 0; }
-  .prog .when { font-weight: 600; font-variant-numeric: tabular-nums; }
-  .prog .days { color: var(--muted); font-size: 15px; }
-  .prog.paused .when, .prog.paused .days { opacity: .5; text-decoration: line-through; }
-  .seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-  .seg button { flex: 1; border-radius: 0; background: transparent; color: var(--text); font-weight: 500; }
-  .seg button.sel { background: var(--accent); color: var(--on-accent); }
-  .days-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-  .days-pick button { padding: 10px 0; background: var(--accent-soft); color: var(--accent); font-weight: 600; min-height: 44px; }
-  .days-pick button.sel { background: var(--accent); color: var(--on-accent); }
-  label { display: block; font-size: 14px; color: var(--muted); margin: 14px 0 6px; }
-  input[type=time], input[type=date], input[type=number] { font: inherit; font-size: 20px; padding: 10px 12px; border-radius: 10px;
-    border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .msg { padding: 12px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 15px; display: none; }
-  .msg.show { display: block; }
-  .msg.info { background: var(--accent-soft); color: var(--text); }
-  .msg.err { background: color-mix(in srgb, var(--off) 15%, transparent); color: var(--text); }
-  .hidden { display: none !important; }
-  .muted { color: var(--muted); font-size: 15px; }
-  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
-  /* Wattanzeige */
-  .gauge { display: block; width: 100%; max-width: 300px; margin: 4px auto 0; }
-  .gauge .track { stroke: var(--track); }
-  .gauge .value { stroke: var(--accent); transition: stroke-dasharray .6s ease; }
-  .gauge .tick { fill: var(--muted); font-size: 11px; }
-  .gauge .watt { fill: var(--text); font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .gauge .unit { fill: var(--muted); font-size: 15px; }
-  .gauge .needle { stroke: var(--text); stroke-width: 3; stroke-linecap: round; transition: transform .6s ease; }
+  button { font: inherit; border: 1px solid rgba(127,245,204,.14); border-radius: 14px; padding: 12px 16px; cursor: pointer;
+    background: var(--btn); color: var(--btn-text); font-weight: 600; min-height: 48px; transition: transform .12s, background .2s, box-shadow .2s; }
+  button:active { transform: scale(.96); }
+  button:hover { background: var(--btn-hi); }
+  button.cta { background: linear-gradient(135deg, #2de0a5, #19a98f); color: #03201a; border: 0; box-shadow: 0 10px 30px -10px rgba(62,240,176,.6); }
+  button.small { min-height: 36px; padding: 6px 12px; font-size: 14px; border-radius: 11px; }
+  button:disabled { opacity: .4; }
+  .big { width: 100%; }
+
+  /* Verbinden */
+  .hero-connect { text-align: center; padding: 34px 20px 26px; }
+  .orb { width: 150px; height: 150px; margin: 6px auto 22px; border-radius: 50%; position: relative;
+    background: radial-gradient(circle at 35% 30%, #5affc8, #109a7b 45%, #052a22 75%);
+    box-shadow: 0 0 60px rgba(62,240,176,.35), inset 0 -10px 30px rgba(0,0,0,.5); animation: breathe 4s ease-in-out infinite; }
+  .orb::before, .orb::after { content: ""; position: absolute; inset: -16px; border-radius: 50%; border: 1px solid rgba(62,240,176,.35); animation: wave 3s ease-out infinite; }
+  .orb::after { animation-delay: 1.5s; }
+  @keyframes breathe { 50% { transform: scale(1.05); box-shadow: 0 0 90px rgba(62,240,176,.5), inset 0 -10px 30px rgba(0,0,0,.5); } }
+  @keyframes wave { from { transform: scale(.85); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
+  .hero-connect p { color: var(--muted); margin: 0 0 20px; }
+
+  /* Leistung */
+  .power-head { display: flex; align-items: flex-end; justify-content: space-between; }
+  .state { font-size: 44px; font-weight: 700; line-height: 1; letter-spacing: 1px; transition: color .4s, text-shadow .4s; color: #ff8f8f; }
+  .state.on { color: var(--mint); text-shadow: 0 0 24px rgba(62,240,176,.55); }
+  .gauge { display: block; width: 100%; max-width: 340px; margin: 6px auto 0; overflow: visible; }
+  .gauge .tk { stroke-width: 4; stroke-linecap: round; transition: stroke .35s, opacity .35s; }
+  .gauge .tk.off { stroke: rgba(255,255,255,.08); }
+  .gauge .num { font-family: var(--mono); font-size: 52px; font-weight: 700; fill: var(--text); }
+  .gauge .unit { font-size: 13px; fill: var(--muted); letter-spacing: 4px; }
+  .gauge .sc { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+  .flow { stroke-dasharray: 2 10; animation: flow 1s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset: -24; } }
+  .switches { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .switches button { min-height: 58px; font-size: 18px; letter-spacing: 1px; }
+
+  /* Tagesuhr */
+  .dial { display: block; width: 100%; max-width: 330px; margin: 0 auto; overflow: visible; }
+  .dial .base { stroke: rgba(255,255,255,.06); }
+  .dial .seg { stroke: url(#gOn); filter: url(#glow); animation: draw 1.1s ease both; }
+  @keyframes draw { from { stroke-dashoffset: 900; } }
+  .dial .hr { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+  .dial .mk { fill: var(--bg); stroke-width: 2.5; }
+  .dial .center1 { font-size: 13px; fill: var(--muted); letter-spacing: 3px; }
+  .dial .center2 { font-family: var(--mono); font-size: 30px; font-weight: 700; fill: var(--text); }
+  .dial .center3 { font-size: 12px; fill: var(--muted); }
+  .chips { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 8px 0 4px; }
+  .chips button { min-height: 40px; padding: 0; font-size: 14px; border-radius: 12px; background: transparent; color: var(--muted); border-color: var(--edge); }
+  .chips button.sel { background: var(--btn); color: var(--btn-text); border-color: rgba(127,245,204,.4); box-shadow: 0 0 16px -4px rgba(62,240,176,.5); }
+  .chips button.today { position: relative; }
+  .chips button.today::after { content: ""; position: absolute; bottom: 5px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--amber); }
+
+  .prog { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--edge); }
+  .prog:first-child { border-top: 0; }
+  .badge { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .badge.on { background: rgba(62,240,176,.13); color: var(--mint); box-shadow: inset 0 0 0 1px rgba(62,240,176,.3); }
+  .badge.off { background: rgba(255,107,107,.11); color: #ff9a9a; box-shadow: inset 0 0 0 1px rgba(255,107,107,.25); }
+  .prog .when { font-family: var(--mono); font-weight: 700; font-size: 19px; }
+  .prog .days { color: var(--muted); font-size: 13px; }
+  .prog.paused { opacity: .45; }
+  .count { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  /* Formulare */
+  .seg2 { display: flex; padding: 4px; gap: 4px; background: rgba(0,0,0,.3); border: 1px solid var(--edge); border-radius: 14px; }
+  .seg2 button { flex: 1; min-height: 42px; background: transparent; border: 0; color: var(--muted); font-weight: 500; border-radius: 10px; }
+  .seg2 button.sel { background: var(--btn); color: var(--btn-text); box-shadow: 0 0 18px -6px rgba(62,240,176,.6); }
+  .days-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .days-pick button { padding: 0; min-height: 42px; background: transparent; color: var(--muted); border-color: var(--edge); font-size: 14px; }
+  .days-pick button.sel { background: var(--btn); color: var(--btn-text); border-color: rgba(127,245,204,.4); }
+  label { display: block; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin: 16px 0 7px; }
+  input[type=time], input[type=date], input[type=number] { font: 600 22px var(--mono); padding: 10px 14px; border-radius: 14px; width: 100%;
+    border: 1px solid var(--edge); background: rgba(0,0,0,.35); color: var(--text); color-scheme: dark; }
+  input:focus { outline: none; border-color: rgba(62,240,176,.5); box-shadow: 0 0 0 3px rgba(62,240,176,.12); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  details.add summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+  details.add summary::-webkit-details-marker { display: none; }
+  details.add summary .plus { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--btn); color: var(--btn-text); font-size: 22px; transition: transform .3s; }
+  details.add[open] summary .plus { transform: rotate(45deg); }
 
   /* Verbrauch */
-  .bars { display: flex; align-items: flex-end; gap: 2px; height: 140px; margin-top: 12px;
-    border-bottom: 1px solid var(--line); }
-  .bars div { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 1px; opacity: .9; }
-  .bars div.zero { background: var(--track); }
-  .axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 4px; }
-  .total { display: flex; gap: 18px; margin-top: 12px; }
-  .total b { font-size: 22px; display: block; font-variant-numeric: tabular-nums; }
-  .switch { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; }
-  .toggle { flex-shrink: 0; width: 54px; min-height: 32px; height: 32px; padding: 0; border-radius: 99px; background: var(--track); position: relative; }
-  .toggle::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%;
-    background: #fff; transition: left .2s; }
-  .toggle.sel { background: var(--accent); }
-  .toggle.sel::after { left: 26px; }
-  .countdown { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bars { display: flex; align-items: flex-end; gap: 3px; height: 150px; margin-top: 16px; position: relative; }
+  .bars div { flex: 1; border-radius: 5px 5px 2px 2px; min-height: 2px; position: relative; cursor: pointer;
+    background: linear-gradient(to top, rgba(31,183,166,.35), var(--mint)); box-shadow: 0 0 14px -4px rgba(62,240,176,.7);
+    transform-origin: bottom; animation: grow .8s cubic-bezier(.2,.8,.2,1) both; }
+  .bars div.zero { background: rgba(255,255,255,.07); box-shadow: none; }
+  .bars div.pick { background: linear-gradient(to top, rgba(255,200,87,.4), var(--amber)); box-shadow: 0 0 18px -2px rgba(255,200,87,.8); }
+  @keyframes grow { from { transform: scaleY(0); } }
+  .axis { display: flex; justify-content: space-between; color: var(--muted); font: 11px var(--mono); margin-top: 6px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .stat { background: rgba(0,0,0,.25); border: 1px solid var(--edge); border-radius: 16px; padding: 12px 14px; }
+  .stat span { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .stat b { display: block; font: 700 22px var(--mono); margin-top: 2px; }
+  .tip { min-height: 20px; font: 13px var(--mono); color: var(--amber); margin-top: 8px; text-align: center; }
+
+  /* Countdown */
+  .cd-wrap { display: grid; place-items: center; }
+  .cd-ring { width: 200px; height: 200px; }
+  .cd-ring .bg { stroke: rgba(255,255,255,.07); }
+  .cd-ring .fg { stroke: url(#gCd); stroke-linecap: round; filter: url(#glow2); transition: stroke-dashoffset 1s linear; }
+  .cd-ring .t { font: 700 30px var(--mono); fill: var(--text); }
+  .cd-ring .s { font-size: 12px; fill: var(--muted); letter-spacing: 2px; }
+
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 4px 0; }
+  .toggle { flex-shrink: 0; width: 58px; min-height: 34px; height: 34px; padding: 0; border-radius: 99px; background: rgba(255,255,255,.1); position: relative; border: 0; }
+  .toggle::after { content: ""; position: absolute; top: 4px; left: 4px; width: 26px; height: 26px; border-radius: 50%; background: #cfe0da; transition: left .25s cubic-bezier(.3,1.5,.5,1); }
+  .toggle.sel { background: linear-gradient(135deg, #2de0a5, #19a98f); box-shadow: 0 0 20px -4px rgba(62,240,176,.8); }
+  .toggle.sel::after { left: 28px; background: #fff; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .hidden { display: none !important; }
+
+  .toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 30px); opacity: 0; z-index: 10; max-width: calc(100% - 32px);
+    padding: 12px 18px; border-radius: 16px; background: rgba(18,40,34,.92); border: 1px solid rgba(62,240,176,.3); color: var(--text);
+    backdrop-filter: blur(12px); font-size: 14px; transition: all .35s cubic-bezier(.2,.8,.2,1); box-shadow: 0 20px 40px -15px #000; }
+  .toast.show { transform: translate(-50%, 0); opacity: 1; }
+  .toast.err { background: rgba(60,18,22,.94); border-color: rgba(255,107,107,.4); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
+<div class="aurora"><i></i><i></i><i></i></div>
+<div class="grain"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="gOn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5affc8"/><stop offset="1" stop-color="#1fb7a6"/></linearGradient>
+    <linearGradient id="gCd" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#3ef0b0"/></linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+</svg>
+
 <main>
-  <h1>Clip-Clap Zeitschaltuhr</h1>
-  <p class="sub" id="devname">Nicht verbunden</p>
+  <header>
+    <div class="brand">Clip-Clap <small>Energie-Cockpit</small></div>
+    <div class="link"><span class="dot" id="dot"></span><span id="devname">offline</span></div>
+  </header>
 
-  <div class="msg" id="msg"></div>
-
-  <section class="card" id="connectCard">
-    <h2>Verbinden</h2>
-    <p class="muted">Die Clip-Clap-App auf dem Handy muss geschlossen sein. Die Uhr spricht immer nur mit einem Gerät.</p>
-    <button class="big" id="btnConnect">Mit Zeitschaltuhr verbinden</button>
+  <section class="card hero-connect" id="connectCard">
+    <div class="orb"></div>
+    <p>Bitte die alte Clip-Clap-App schliessen.<br>Die Uhr spricht immer nur mit einem Gerät.</p>
+    <button class="cta big" id="btnConnect">Verbinden</button>
   </section>
 
   <div id="app" class="hidden">
-    <!-- Steckdose und Wattanzeige -->
+    <!-- Leistung -->
     <section class="card">
-      <div class="row">
-        <div class="grow">
-          <div class="muted">Steckdose jetzt</div>
-          <div class="state" id="state">?</div>
-        </div>
-        <button class="ghost" id="btnOn">Ein</button>
-        <button class="ghost" id="btnOff">Aus</button>
+      <div class="power-head">
+        <div><p class="label">Steckdose</p><div class="state" id="state">?</div></div>
+        <div class="muted" id="since" style="text-align:right"></div>
       </div>
-      <svg class="gauge" viewBox="0 0 240 200" aria-label="Aktuelle Leistung">
-        <path id="gTrack" class="track" fill="none" stroke-width="16" stroke-linecap="round"/>
-        <path id="gValue" class="value" fill="none" stroke-width="16" stroke-linecap="round"/>
+      <svg class="gauge" viewBox="0 0 300 262" aria-label="Aktuelle Leistung">
         <g id="gTicks"></g>
-        <line id="gNeedle" class="needle" x1="120" y1="120" x2="120" y2="52"/>
-        <circle cx="120" cy="120" r="6" fill="var(--text)"/>
-        <text id="gWatt" class="watt" x="120" y="172" text-anchor="middle">0</text>
-        <text class="unit" x="120" y="192" text-anchor="middle">Watt</text>
+        <g id="gScale"></g>
+        <circle cx="150" cy="150" r="58" fill="rgba(0,0,0,.35)" stroke="rgba(255,255,255,.06)"/>
+        <circle id="gPulse" cx="150" cy="150" r="58" fill="none" stroke="var(--mint)" stroke-width="1.5" class="flow" opacity="0"/>
+        <text id="gWatt" class="num" x="150" y="166" text-anchor="middle">0</text>
+        <text class="unit" x="150" y="186" text-anchor="middle">WATT</text>
       </svg>
+      <div class="switches">
+        <button id="btnOn">EIN</button>
+        <button id="btnOff">AUS</button>
+      </div>
+    </section>
+
+    <!-- Tagesuhr -->
+    <section class="card">
+      <div class="row"><p class="label grow" style="margin:0">Tagesuhr</p><span class="count" id="count"></span></div>
+      <div class="chips" id="dayChips"></div>
+      <svg class="dial" viewBox="-22 -22 344 344" id="dial" aria-label="Schaltzeiten des Tages"></svg>
+      <div id="list" style="margin-top:6px"></div>
+    </section>
+
+    <!-- Neues Programm -->
+    <section class="card">
+      <details class="add" id="addBox">
+        <summary><span class="label" style="margin:0">Neues Programm</span><span class="plus">+</span></summary>
+        <div style="margin-top:14px">
+          <div class="seg2" id="segAction">
+            <button data-v="1" class="sel">Einschalten</button>
+            <button data-v="0">Ausschalten</button>
+          </div>
+          <label for="time">Uhrzeit</label>
+          <input type="time" id="time" value="07:00">
+          <label>Wie oft</label>
+          <div class="seg2" id="segRepeat">
+            <button data-v="week" class="sel">Jede Woche</button>
+            <button data-v="once">Einmalig</button>
+          </div>
+          <div id="weekBox">
+            <label>Wochentage</label>
+            <div class="days-pick" id="days"></div>
+            <div class="quick">
+              <button class="small" data-q="days:Mo,Di,Mi,Do,Fr">Mo bis Fr</button>
+              <button class="small" data-q="days:Sa,So">Wochenende</button>
+              <button class="small" data-q="days:Mo,Di,Mi,Do,Fr,Sa,So">Jeden Tag</button>
+            </div>
+          </div>
+          <div id="onceBox" class="hidden">
+            <label for="date">Datum</label>
+            <input type="date" id="date">
+          </div>
+          <button class="cta big" id="btnSave" style="margin-top:18px">Programm speichern</button>
+        </div>
+      </details>
     </section>
 
     <!-- Verbrauch -->
     <section class="card">
-      <h2>Stromverbrauch</h2>
-      <div class="seg" id="segEnergy">
+      <p class="label">Stromverbrauch</p>
+      <div class="seg2" id="segEnergy">
         <button data-v="day" class="sel">24 Std.</button>
         <button data-v="week">7 Tage</button>
         <button data-v="month">30 Tage</button>
       </div>
       <div class="bars" id="bars"></div>
       <div class="axis" id="axis"></div>
-      <div class="total">
-        <div><span class="muted">Verbrauch</span><b id="eTotal">0</b></div>
-        <div id="costBox"><span class="muted">Kosten</span><b id="eCost">?</b></div>
+      <div class="tip" id="tip">Balken antippen für Details</div>
+      <div class="stats">
+        <div class="stat"><span>Verbrauch</span><b id="eTotal">0</b></div>
+        <div class="stat"><span>Kosten</span><b id="eCost">?</b></div>
       </div>
-      <label for="price">Strompreis in Rappen pro kWh (für die Kostenberechnung)</label>
+      <label for="price">Strompreis (Rappen pro kWh)</label>
       <input type="number" id="price" inputmode="decimal" min="0" step="0.1" placeholder="z.B. 29">
-    </section>
-
-    <!-- Zeitprogramme -->
-    <section class="card">
-      <div class="row" style="margin-bottom:4px">
-        <h2 class="grow" style="margin:0">Zeitprogramme</h2>
-        <span class="muted" id="count"></span>
-      </div>
-      <div id="list"><p class="muted">Wird geladen ...</p></div>
-    </section>
-
-    <section class="card">
-      <h2>Neues Programm</h2>
-      <div class="seg" id="segAction">
-        <button data-v="1" class="sel">Einschalten</button>
-        <button data-v="0">Ausschalten</button>
-      </div>
-      <label for="time">Uhrzeit</label>
-      <input type="time" id="time" value="07:00">
-      <label>Wie oft</label>
-      <div class="seg" id="segRepeat">
-        <button data-v="week" class="sel">Jede Woche</button>
-        <button data-v="once">Einmalig</button>
-      </div>
-      <div id="weekBox">
-        <label>Wochentage</label>
-        <div class="days-pick" id="days"></div>
-        <div class="quick">
-          <button class="small ghost" data-q="days:Mo,Di,Mi,Do,Fr">Mo bis Fr</button>
-          <button class="small ghost" data-q="days:Sa,So">Wochenende</button>
-          <button class="small ghost" data-q="days:Mo,Di,Mi,Do,Fr,Sa,So">Jeden Tag</button>
-        </div>
-      </div>
-      <div id="onceBox" class="hidden">
-        <label for="date">Datum</label>
-        <input type="date" id="date">
-      </div>
-      <button class="big" id="btnSave" style="margin-top:18px">Programm speichern</button>
     </section>
 
     <!-- Countdown -->
     <section class="card">
-      <h2>Countdown</h2>
-      <div id="cdRunning" class="hidden">
-        <div class="muted" id="cdText"></div>
-        <div class="countdown" id="cdLeft">00:00:00</div>
-        <button class="ghost big" id="btnCdStop" style="margin-top:10px">Countdown stoppen</button>
+      <p class="label">Countdown</p>
+      <div id="cdRunning" class="hidden cd-wrap">
+        <svg class="cd-ring" viewBox="0 0 200 200">
+          <circle class="bg" cx="100" cy="100" r="84" fill="none" stroke-width="10"/>
+          <circle id="cdArc" class="fg" cx="100" cy="100" r="84" fill="none" stroke-width="10"
+            stroke-dasharray="527.8" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+          <text id="cdLeft" class="t" x="100" y="106" text-anchor="middle">00:00:00</text>
+          <text id="cdText" class="s" x="100" y="132" text-anchor="middle">DANN AUS</text>
+        </svg>
+        <button class="big" id="btnCdStop" style="margin-top:10px">Countdown stoppen</button>
       </div>
       <div id="cdForm">
-        <p class="muted" style="margin-top:0">Schaltet die Steckdose nach Ablauf der Zeit einmalig.</p>
-        <div class="seg" id="segCd">
+        <div class="seg2" id="segCd">
           <button data-v="2" class="sel">Danach aus</button>
           <button data-v="1">Danach ein</button>
         </div>
@@ -196,15 +299,21 @@
           <div><label for="cdH">Stunden</label><input type="number" id="cdH" min="0" max="99" value="1" inputmode="numeric"></div>
           <div><label for="cdM">Minuten</label><input type="number" id="cdM" min="0" max="59" value="0" inputmode="numeric"></div>
         </div>
-        <button class="big" id="btnCdStart" style="margin-top:14px">Countdown starten</button>
+        <div class="quick">
+          <button class="small" data-cd="15">15 Min.</button>
+          <button class="small" data-cd="30">30 Min.</button>
+          <button class="small" data-cd="60">1 Std.</button>
+          <button class="small" data-cd="120">2 Std.</button>
+        </div>
+        <button class="cta big" id="btnCdStart" style="margin-top:14px">Countdown starten</button>
       </div>
     </section>
 
     <!-- Zufall -->
     <section class="card">
       <div class="switch">
-        <div><h2 style="margin:0">Zufallsschaltung</h2>
-          <div class="muted">Ferienmodus: schaltet im Zeitfenster zufällig ein und aus, damit das Haus bewohnt wirkt.</div></div>
+        <div><p class="label" style="margin:0 0 4px">Ferienmodus</p>
+          <div class="muted">Schaltet im Zeitfenster zufällig ein und aus, damit das Haus bewohnt wirkt.</div></div>
         <button class="toggle" id="rndToggle" aria-label="Zufallsschaltung ein oder aus"></button>
       </div>
       <label>Wochentage</label>
@@ -213,24 +322,24 @@
         <div><label for="rndFrom">Von</label><input type="time" id="rndFrom" value="18:00"></div>
         <div><label for="rndTo">Bis</label><input type="time" id="rndTo" value="23:00"></div>
       </div>
-      <button class="big" id="btnRnd" style="margin-top:14px">Zufallsschaltung speichern</button>
+      <button class="big" id="btnRnd" style="margin-top:14px">Ferienmodus speichern</button>
     </section>
 
     <!-- Weiteres -->
     <section class="card">
-      <h2>Weiteres</h2>
       <div class="switch">
-        <div>Kontrolllampe an der Steckdose</div>
+        <div><p class="label" style="margin:0 0 4px">Kontrolllampe</p><div class="muted">Leuchtanzeige an der Steckdose</div></div>
         <button class="toggle" id="ledToggle" aria-label="Kontrolllampe"></button>
       </div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost grow" id="btnTime">Uhrzeit der Uhr stellen</button>
-        <button class="ghost grow" id="btnDisconnect">Trennen</button>
+      <div class="row" style="margin-top:14px">
+        <button class="grow" id="btnTime">Uhrzeit stellen</button>
+        <button class="grow" id="btnDisconnect">Trennen</button>
       </div>
-      <p class="muted" style="margin-bottom:0">Die Uhrzeit wird beim Verbinden automatisch gestellt. Höchstens 12 Programme.</p>
+      <p class="muted" style="margin:12px 0 0">Die Uhrzeit wird beim Verbinden automatisch gestellt. Höchstens 12 Programme.</p>
     </section>
   </div>
 </main>
+<div class="toast" id="toast"></div>
 
 <script>
 "use strict";
@@ -238,17 +347,25 @@ const SVC = "0000fff0-0000-1000-8000-00805f9b34fb";
 const W   = "0000fff3-0000-1000-8000-00805f9b34fb";
 const N   = "0000fff4-0000-1000-8000-00805f9b34fb";
 const PASSWORT = "0000";
-const TAGE = ["So","Mo","Di","Mi","Do","Fr","Sa"];       // Bit 0 = So ... Bit 6 = Sa
-const ANZEIGE = ["Mo","Di","Mi","Do","Fr","Sa","So"];    // Reihenfolge auf dem Bildschirm
+const TAGE = ["So","Mo","Di","Mi","Do","Fr","Sa"];       // Bit 0 = So ... Bit 6 = Sa (wie Date.getDay)
+const ANZEIGE = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+const LANG = { So: "Sonntag", Mo: "Montag", Di: "Dienstag", Mi: "Mittwoch", Do: "Donnerstag", Fr: "Freitag", Sa: "Samstag" };
 const MAX = 12;
+const SVGNS = "http://www.w3.org/2000/svg";
 
-let device = null, chW = null, buf = [], waiters = [], rules = [], busy = false;
+let device = null, chW = null, buf = [], waiters = [], rules = [], busy = false, isOn = false;
 let chain = Promise.resolve(), pollTimer = null, cdTimer = null;
 const $ = id => document.getElementById(id);
 const two = n => String(n).padStart(2, "0");
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+};
+const el = (tag, attrs = {}, text) => {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text !== undefined) e.textContent = text;
+  return e;
 };
 
 /* ---------- Protokoll ---------- */
@@ -261,7 +378,6 @@ function frame(cmd, payload = [0, 0]) {
   f[f.length - 3] = c & 0xFF; f[f.length - 2] = 0xFF; f[f.length - 1] = 0xFF;
   return f;
 }
-
 function onNotify(ev) {
   const d = Array.from(new Uint8Array(ev.target.value.buffer));
   buf = d[0] === 0x0F ? d : buf.concat(d);
@@ -271,7 +387,6 @@ function onNotify(ev) {
     if (i >= 0) { const w = waiters.splice(i, 1)[0]; clearTimeout(w.t); w.res(msg); }
   }
 }
-
 // Befehle laufen nacheinander, damit sich Abfragen nicht in die Quere kommen.
 function send(cmd, payload, timeout = 3000) {
   const job = chain.then(() => new Promise(async res => {
@@ -284,10 +399,8 @@ function send(cmd, payload, timeout = 3000) {
   chain = job.catch(() => {});
   return job;
 }
-
 const decodeRule = b => ({ nr: b[0], aktiv: b[1] === 1, ein: b[2] === 1, tage: b[3], datum: b.slice(4, 9) });
 const encodeRule = r => [r.nr, r.aktiv ? 1 : 0, r.ein ? 1 : 0, r.tage, ...r.datum];
-
 async function readRules() {
   const all = [];
   for (let page = 0; page < 7; page++) {
@@ -299,71 +412,209 @@ async function readRules() {
   }
   return all;
 }
-
 async function setRule(mode, r) {              // 0 neu, 1 aendern, 2 loeschen
   const a = await send(19, [mode, ...encodeRule(r)]);
   if (!a) throw new Error("Die Uhr hat nicht geantwortet.");
   if (a[4] !== 0) throw new Error("Die Uhr hat den Befehl abgelehnt.");
 }
-
 function setClock() {
   const t = new Date(), y = t.getFullYear();
   return send(1, [t.getSeconds(), t.getMinutes(), t.getHours(), t.getDate(), t.getMonth() + 1, y >> 8, y & 255, 0, 0]);
 }
 
 /* ---------- Meldungen ---------- */
-function show(text, kind = "info", ms = 4000) {
-  const m = $("msg"); m.textContent = text; m.className = "msg show " + kind;
-  clearTimeout(show.t); if (ms) show.t = setTimeout(() => m.className = "msg", ms);
+function show(text, kind = "info", ms = 3200) {
+  const t = $("toast"); t.textContent = text; t.className = "toast show" + (kind === "err" ? " err" : "");
+  clearTimeout(show.t); if (ms) show.t = setTimeout(() => t.className = "toast" + (kind === "err" ? " err" : ""), ms);
 }
 
-/* ---------- Wattanzeige (Skala wie in der Original-App) ---------- */
-const CX = 120, CY = 120, R = 88, START = -140, SWEEP = 280;
-const pt = (deg, r = R) => { const a = deg * Math.PI / 180; return [CX + r * Math.sin(a), CY - r * Math.cos(a)]; };
-function arcPath(from, to) {
-  const [x1, y1] = pt(from), [x2, y2] = pt(to);
-  return `M${x1.toFixed(1)} ${y1.toFixed(1)} A${R} ${R} 0 ${to - from > 180 ? 1 : 0} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+/* ---------- LED-Wattskala (Skala wie in der Original-App) ---------- */
+const GC = 150, GR = 118, START = -135, SWEEP = 270, NT = 54;
+const polar = (deg, r, cx = GC, cy = GC) => { const a = deg * Math.PI / 180; return [cx + r * Math.sin(a), cy - r * Math.cos(a)]; };
+const ticks = [];
+for (let i = 0; i < NT; i++) {
+  const d = START + i * SWEEP / (NT - 1);
+  const [x1, y1] = polar(d, GR - 14), [x2, y2] = polar(d, GR + (i % 9 === 0 ? 4 : 0));
+  const t = el("line", { x1: x1.toFixed(1), y1: y1.toFixed(1), x2: x2.toFixed(1), y2: y2.toFixed(1), class: "tk off" });
+  $("gTicks").appendChild(t); ticks.push(t);
 }
-let scale = null;
+function mix(a, b, f) { return a.map((v, i) => Math.round(v + (b[i] - v) * f)); }
+function tickColor(f) {   // Mint, dann Gelb, dann Korall
+  const c = f < .6 ? mix([62, 240, 176], [255, 200, 87], f / .6) : mix([255, 200, 87], [255, 107, 107], (f - .6) / .4);
+  return `rgb(${c})`;
+}
+let scale = null, shownWatt = 0, wattAnim = null;
 function setScale(steps) {
   if (scale && scale.join() === steps.join()) return;
-  scale = steps;
-  const g = $("gTicks"); g.innerHTML = "";
+  scale = steps; const g = $("gScale"); g.innerHTML = "";
   steps.forEach((v, i) => {
-    const [x, y] = pt(START + i * SWEEP / 4, R - 26);
-    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    t.setAttribute("x", x.toFixed(1)); t.setAttribute("y", (y + 4).toFixed(1));
-    t.setAttribute("text-anchor", "middle"); t.setAttribute("class", "tick");
-    t.textContent = v; g.appendChild(t);
+    const [x, y] = polar(START + i * SWEEP / 4, GR + 17);
+    g.appendChild(el("text", { x: x.toFixed(1), y: (y + 4).toFixed(1), "text-anchor": "middle", class: "sc" }, v));
   });
 }
-function wattToDeg(w) {
+function wattToFrac(w) {
   const s = scale;
   if (w <= 0) return 0;
-  for (let i = 0; i < 4; i++) {
-    if (w <= s[i + 1]) return (i + (w - s[i]) / (s[i + 1] - s[i])) * SWEEP / 4;
-  }
-  return SWEEP;
+  for (let i = 0; i < 4; i++) if (w <= s[i + 1]) return (i + (w - s[i]) / (s[i + 1] - s[i])) / 4;
+  return 1;
 }
-function showWatt(w) {
+function paintWatt(w) {
   setScale(w > 1500 ? [0, 30, 300, 1500, 4500] : [0, 10, 100, 500, 1500]);
-  const deg = wattToDeg(w);
-  $("gValue").setAttribute("d", deg > 0.5 ? arcPath(START, START + deg) : "");
-  $("gNeedle").style.transform = `rotate(${START + deg}deg)`;
-  $("gNeedle").style.transformOrigin = "120px 120px";
+  const lit = Math.round(wattToFrac(w) * (NT - 1)) + (w > 0 ? 1 : 0);
+  ticks.forEach((t, i) => {
+    if (i < lit) { const c = tickColor(i / (NT - 1)); t.setAttribute("class", "tk"); t.style.stroke = c; t.style.filter = `drop-shadow(0 0 4px ${c})`; }
+    else { t.setAttribute("class", "tk off"); t.style.stroke = ""; t.style.filter = ""; }
+  });
   $("gWatt").textContent = w < 10 ? w.toFixed(1) : Math.round(w).toLocaleString("de-CH");
+  $("gPulse").setAttribute("opacity", w > 0.5 ? ".7" : "0");
 }
-$("gTrack").setAttribute("d", arcPath(START, START + SWEEP));
-showWatt(0);
+function showWatt(target) {   // sanft hochzählen
+  cancelAnimationFrame(wattAnim);
+  const from = shownWatt, t0 = performance.now();
+  const step = now => {
+    const f = Math.min(1, (now - t0) / 700), e = 1 - Math.pow(1 - f, 3);
+    shownWatt = from + (target - from) * e; paintWatt(shownWatt);
+    if (f < 1) wattAnim = requestAnimationFrame(step);
+  };
+  wattAnim = requestAnimationFrame(step);
+}
+paintWatt(0);
 
 /* ---------- Steckdose ---------- */
 async function refreshState() {
   const s = await send(4);
   if (!s) return;
-  const on = s[4] === 1;
-  $("state").textContent = on ? "EIN" : "AUS"; $("state").className = "state " + (on ? "on" : "off");
+  isOn = s[4] === 1;
+  $("state").textContent = isOn ? "EIN" : "AUS"; $("state").className = "state" + (isOn ? " on" : "");
+  document.body.classList.toggle("on", isOn);
   showWatt((((s[6] << 24) | (s[7] << 16) | (s[8] << 8) | s[9]) >>> 0) / 1000);
+  renderNext();
 }
+
+/* ---------- Tagesuhr ---------- */
+let dialDay = new Date().getDay();
+function dateForWeekday(wd) { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + ((wd - d.getDay() + 7) % 7)); return d; }
+function eventsOn(date) {
+  const wd = date.getDay();
+  return rules.filter(r => r.aktiv && (r.tage ? r.tage & (1 << wd)
+      : (2000 + r.datum[0] === date.getFullYear() && r.datum[1] === date.getMonth() + 1 && r.datum[2] === date.getDate())))
+    .map(r => ({ m: r.datum[3] * 60 + r.datum[4], ein: r.ein })).sort((a, b) => a.m - b.m);
+}
+function stateAtStart(date) {   // letzter Schaltbefehl der Vortage bestimmt den Zustand um Mitternacht
+  for (let back = 1; back <= 7; back++) {
+    const d = new Date(date); d.setDate(d.getDate() - back);
+    const ev = eventsOn(d);
+    if (ev.length) return ev[ev.length - 1].ein;
+  }
+  return false;
+}
+function onSegments(date) {
+  const ev = eventsOn(date), segs = [];
+  let on = stateAtStart(date), from = 0;
+  ev.forEach(e => {
+    if (e.ein && !on) { on = true; from = e.m; }
+    else if (!e.ein && on) { on = false; if (e.m > from) segs.push([from, e.m]); }
+  });
+  if (on) segs.push([from, 1440]);
+  return { segs, ev };
+}
+function renderDial() {
+  const svg = $("dial"); svg.innerHTML = "";
+  const C = 150, R = 112, date = dateForWeekday(dialDay), isToday = dialDay === new Date().getDay();
+  const { segs, ev } = onSegments(date);
+  const ang = m => m / 1440 * 360;
+  svg.appendChild(el("circle", { cx: C, cy: C, r: R, fill: "none", class: "base", "stroke-width": 20 }));
+  for (let h = 0; h < 24; h++) {   // Stundenstriche
+    const [x1, y1] = polar(ang(h * 60), R - 22, C, C), [x2, y2] = polar(ang(h * 60), R - (h % 6 ? 26 : 32), C, C);
+    svg.appendChild(el("line", { x1, y1, x2, y2, stroke: "rgba(255,255,255,.18)", "stroke-width": h % 6 ? 1 : 2 }));
+  }
+  [0, 6, 12, 18].forEach(h => {
+    const [x, y] = polar(ang(h * 60), R - 44, C, C);
+    svg.appendChild(el("text", { x, y: y + 4, "text-anchor": "middle", class: "hr" }, two(h)));
+  });
+  let onMin = 0;
+  segs.forEach(([a, b]) => {
+    onMin += b - a;
+    const a1 = ang(a), a2 = ang(Math.min(b, 1439.9));
+    const [x1, y1] = polar(a1, R, C, C), [x2, y2] = polar(a2, R, C, C);
+    svg.appendChild(el("path", { d: `M${x1} ${y1} A${R} ${R} 0 ${a2 - a1 > 180 ? 1 : 0} 1 ${x2} ${y2}`,
+      fill: "none", class: "seg", "stroke-width": 20, "stroke-linecap": "round", "stroke-dasharray": 900 }));
+  });
+  ev.forEach(e => {   // Schaltpunkte
+    const [x, y] = polar(ang(e.m), R, C, C);
+    svg.appendChild(el("circle", { cx: x, cy: y, r: 5, class: "mk", stroke: e.ein ? "#3ef0b0" : "#ff6b6b" }));
+    const [lx, ly] = polar(ang(e.m), R + 24, C, C);
+    svg.appendChild(el("text", { x: lx, y: ly + 4, "text-anchor": "middle", class: "hr", fill: e.ein ? "#3ef0b0" : "#ff9a9a" },
+      `${two(Math.floor(e.m / 60))}:${two(e.m % 60)}`));
+  });
+  if (isToday) {   // Jetzt-Zeiger
+    const now = new Date(), m = now.getHours() * 60 + now.getMinutes();
+    const [x1, y1] = polar(ang(m), R - 30, C, C), [x2, y2] = polar(ang(m), R + 12, C, C);
+    svg.appendChild(el("line", { x1, y1, x2, y2, stroke: "#ffc857", "stroke-width": 3, "stroke-linecap": "round", style: "filter:drop-shadow(0 0 6px #ffc857)" }));
+  }
+  svg.appendChild(el("text", { x: C, y: C - 22, "text-anchor": "middle", class: "center1" }, (isToday ? "HEUTE" : LANG[TAGE[dialDay]].toUpperCase())));
+  svg.appendChild(el("text", { x: C, y: C + 12, "text-anchor": "middle", class: "center2" }, `${Math.floor(onMin / 60)}h ${two(onMin % 60)}`));
+  svg.appendChild(el("text", { x: C, y: C + 32, "text-anchor": "middle", class: "center3" }, "eingeschaltet"));
+}
+function renderChips() {
+  const box = $("dayChips"); box.innerHTML = "";
+  const today = new Date().getDay();
+  ANZEIGE.forEach(t => {
+    const wd = TAGE.indexOf(t), b = document.createElement("button");
+    b.textContent = t; b.className = (wd === dialDay ? "sel" : "") + (wd === today ? " today" : "");
+    b.onclick = () => { dialDay = wd; renderChips(); renderDial(); };
+    box.appendChild(b);
+  });
+}
+function renderNext() {   // naechster Schaltpunkt
+  const now = new Date();
+  for (let add = 0; add < 8; add++) {
+    const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + add);
+    const nowM = add ? -1 : now.getHours() * 60 + now.getMinutes();
+    const e = eventsOn(d).find(x => x.m > nowM);
+    if (e) {
+      const when = add === 0 ? "heute" : add === 1 ? "morgen" : LANG[TAGE[d.getDay()]];
+      $("since").innerHTML = `Nächster Schaltpunkt<br><b style="color:var(--text)">${e.ein ? "Ein" : "Aus"} ${when} ${two(Math.floor(e.m / 60))}:${two(e.m % 60)}</b>`;
+      return;
+    }
+  }
+  $("since").textContent = "";
+}
+
+function daysText(bits) {
+  const sel = ANZEIGE.filter(t => bits & (1 << TAGE.indexOf(t)));
+  if (sel.length === 7) return "Jeden Tag";
+  if (sel.join() === "Mo,Di,Mi,Do,Fr") return "Mo bis Fr";
+  if (sel.join() === "Sa,So") return "Wochenende";
+  return sel.join(", ");
+}
+function renderRules() {
+  $("count").textContent = rules.length + " / " + MAX + " Programme";
+  const list = $("list"); list.innerHTML = "";
+  if (!rules.length) list.innerHTML = '<p class="muted">Keine Programme gespeichert.</p>';
+  [...rules].sort((a, b) => (a.datum[3] * 60 + a.datum[4]) - (b.datum[3] * 60 + b.datum[4])).forEach(r => {
+    const [yy, mm, dd, hh, mi] = r.datum;
+    const row = document.createElement("div");
+    row.className = "prog" + (r.aktiv ? "" : " paused");
+    const days = r.tage ? daysText(r.tage) : `einmalig am ${two(dd)}.${two(mm)}.${2000 + yy}`;
+    row.innerHTML = `
+      <div class="badge ${r.ein ? "on" : "off"}">${r.ein ? "EIN" : "AUS"}</div>
+      <div class="grow"><div class="when">${two(hh)}:${two(mi)}</div><div class="days">${days}${r.aktiv ? "" : " · pausiert"}</div></div>
+      <button class="small" data-act="toggle">${r.aktiv ? "Pause" : "Aktiv"}</button>
+      <button class="small" data-act="del" aria-label="Löschen">✕</button>`;
+    row.querySelector("[data-act=toggle]").onclick = () => run(async () => {
+      await setRule(1, { ...r, aktiv: !r.aktiv }); await refreshRules();
+      show(r.aktiv ? "Programm pausiert." : "Programm wieder aktiv.");
+    });
+    row.querySelector("[data-act=del]").onclick = () => {
+      if (!confirm(`Programm ${r.ein ? "EIN" : "AUS"} um ${two(hh)}:${two(mi)} löschen?`)) return;
+      run(async () => { await setRule(2, r); await refreshRules(); show("Programm gelöscht."); });
+    };
+    list.appendChild(row);
+  });
+  renderChips(); renderDial(); renderNext();
+}
+async function refreshRules() { rules = await readRules(); renderRules(); }
 
 /* ---------- Verbrauch ---------- */
 let energyView = "day", energyData = { day: null, month: null };
@@ -375,75 +626,46 @@ async function loadEnergy() {
     ((m[4 + 4 * i] << 24) | (m[5 + 4 * i] << 16) | (m[6 + 4 * i] << 8) | m[7 + 4 * i]) >>> 0);
   renderEnergy();
 }
-function fmtEnergy(wh) {
-  return wh >= 1000 ? (wh / 1000).toLocaleString("de-CH", { maximumFractionDigits: 2 }) + " kWh"
-                    : Math.round(wh) + " Wh";
-}
+const fmtEnergy = wh => wh >= 1000 ? (wh / 1000).toLocaleString("de-CH", { maximumFractionDigits: 2 }) + " kWh" : Math.round(wh) + " Wh";
 function renderEnergy() {
-  let vals, labels;
+  let vals, labels, names;
   const now = new Date();
   if (energyView === "day") {
     vals = (energyData.day || Array(24).fill(0)).map(v => v === 0xFFFF ? 0 : v);
     const h = now.getHours();
+    names = vals.map((_, i) => `${two((h + 1 + i) % 24)}:00 bis ${two((h + 2 + i) % 24)}:00`);
     labels = [two((h + 1) % 24) + ":00", two((h + 13) % 24) + ":00", "jetzt"];
   } else {
     const n = energyView === "week" ? 7 : 30;
     vals = (energyData.month || Array(30).fill(0)).slice(30 - n).map(v => v === 0xFFFFFFFF ? 0 : v);
+    names = vals.map((_, i) => { const d = new Date(now); d.setDate(now.getDate() - (n - 1 - i));
+      return `${LANG[TAGE[d.getDay()]]}, ${d.getDate()}.${d.getMonth() + 1}.`; });
     const first = new Date(now); first.setDate(now.getDate() - (n - 1));
     labels = [`${first.getDate()}.${first.getMonth() + 1}.`, "heute"];
   }
   const max = Math.max(...vals, 1);
-  $("bars").innerHTML = vals.map(v =>
-    `<div class="${v ? "" : "zero"}" style="height:${v ? Math.max(2, v / max * 100) : 1}%" title="${fmtEnergy(v)}"></div>`).join("");
+  const bars = $("bars"); bars.innerHTML = "";
+  vals.forEach((v, i) => {
+    const b = document.createElement("div");
+    b.className = v ? "" : "zero"; b.style.height = (v ? Math.max(3, v / max * 100) : 2) + "%";
+    b.style.animationDelay = (i * 18) + "ms";
+    b.onclick = () => { bars.querySelectorAll(".pick").forEach(x => x.classList.remove("pick")); if (v) b.classList.add("pick");
+      $("tip").textContent = `${names[i]}: ${fmtEnergy(v)}`; };
+    bars.appendChild(b);
+  });
   $("axis").innerHTML = labels.map(l => `<span>${l}</span>`).join("");
+  $("tip").textContent = "Balken antippen für Details";
   const total = vals.reduce((a, b) => a + b, 0);
   $("eTotal").textContent = fmtEnergy(total);
   const price = parseFloat($("price").value);
-  $("eCost").textContent = isNaN(price) ? "Preis fehlt"
+  $("eCost").textContent = isNaN(price) ? "Preis?"
     : "CHF " + (total / 1000 * price / 100).toLocaleString("de-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 $("price").value = store.get("clipclap-price") || "";
 $("price").oninput = () => { store.set("clipclap-price", $("price").value); renderEnergy(); };
 
-/* ---------- Zeitprogramme ---------- */
-function daysText(bits) {
-  const sel = ANZEIGE.filter(t => bits & (1 << TAGE.indexOf(t)));
-  if (sel.length === 7) return "Jeden Tag";
-  if (sel.join() === "Mo,Di,Mi,Do,Fr") return "Mo bis Fr";
-  if (sel.join() === "Sa,So") return "Wochenende";
-  return sel.join(", ");
-}
-const ruleMinutes = r => r.datum[3] * 60 + r.datum[4];
-
-function renderRules() {
-  $("count").textContent = rules.length + " von " + MAX;
-  const list = $("list"); list.innerHTML = "";
-  if (!rules.length) { list.innerHTML = '<p class="muted">Keine Programme gespeichert.</p>'; return; }
-  [...rules].sort((a, b) => ruleMinutes(a) - ruleMinutes(b)).forEach(r => {
-    const [yy, mm, dd, hh, mi] = r.datum;
-    const row = document.createElement("div");
-    row.className = "prog" + (r.aktiv ? "" : " paused");
-    const days = r.tage ? daysText(r.tage) : `einmalig am ${two(dd)}.${two(mm)}.${2000 + yy}`;
-    row.innerHTML = `
-      <span class="pill ${r.ein ? "on" : "off"}">${r.ein ? "EIN" : "AUS"}</span>
-      <div class="grow"><div class="when">${two(hh)}:${two(mi)}</div><div class="days">${days}${r.aktiv ? "" : " (pausiert)"}</div></div>
-      <button class="small ghost" data-act="toggle">${r.aktiv ? "Pause" : "Aktiv"}</button>
-      <button class="small ghost" data-act="del">Löschen</button>`;
-    row.querySelector("[data-act=toggle]").onclick = () => run(async () => {
-      await setRule(1, { ...r, aktiv: !r.aktiv }); await refreshRules();
-      show(r.aktiv ? "Programm pausiert." : "Programm wieder aktiv.");
-    });
-    row.querySelector("[data-act=del]").onclick = () => {
-      if (!confirm(`Programm ${r.ein ? "EIN" : "AUS"} um ${two(hh)}:${two(mi)} löschen?`)) return;
-      run(async () => { await setRule(2, r); await refreshRules(); show("Programm gelöscht."); });
-    };
-    list.appendChild(row);
-  });
-}
-async function refreshRules() { rules = await readRules(); renderRules(); }
-
 /* ---------- Countdown ---------- */
-let cdTarget = null, cdMode = 0;
+let cdTarget = null, cdMode = 0, cdChoice = 2;
 async function loadCountdown() {
   const c = await send(9);
   if (!c) return;
@@ -457,10 +679,12 @@ function renderCountdown() {
   $("cdRunning").classList.toggle("hidden", !running);
   $("cdForm").classList.toggle("hidden", running);
   if (!running) return;
-  $("cdText").textContent = cdMode === 1 ? "Steckdose wird eingeschaltet in" : "Steckdose wird ausgeschaltet in";
+  $("cdText").textContent = cdMode === 1 ? "DANN EIN" : "DANN AUS";
+  const total = Math.max(parseInt(store.get("clipclap-cd-total")) || 0, Math.round((cdTarget - new Date()) / 1000));
   const tick = () => {
     const s = Math.max(0, Math.round((cdTarget - new Date()) / 1000));
     $("cdLeft").textContent = `${two(Math.floor(s / 3600))}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}`;
+    $("cdArc").setAttribute("stroke-dashoffset", (527.8 * (1 - s / total)).toFixed(1));
     if (s === 0) { clearInterval(cdTimer); setTimeout(() => { loadCountdown(); refreshState(); }, 2500); }
   };
   tick(); cdTimer = setInterval(tick, 1000);
@@ -469,9 +693,8 @@ function countdownPayload(mode, seconds) {
   const t = new Date(Date.now() + (seconds + 1) * 1000);
   return [mode, t.getSeconds(), t.getMinutes(), t.getHours(), t.getDate(), t.getMonth() + 1, t.getFullYear() - 2000, 0, 0, 0, 0];
 }
-let cdChoice = 2;
 
-/* ---------- Zufall ---------- */
+/* ---------- Ferienmodus ---------- */
 const rnd = { on: false, tage: new Set(["Mo","Di","Mi","Do","Fr","Sa","So"]) };
 async function loadRandom() {
   const z = await send(22);
@@ -479,47 +702,37 @@ async function loadRandom() {
   rnd.on = z[4] === 1;
   if (rnd.on) {   // Die Uhr vergisst Tage und Zeiten, wenn die Funktion aus ist.
     rnd.tage = new Set(TAGE.filter((t, i) => z[5] & (1 << i)));
-    $("rndFrom").value = `${two(z[6])}:${two(z[7])}`;
-    $("rndTo").value = `${two(z[8])}:${two(z[9])}`;
+    $("rndFrom").value = `${two(z[6])}:${two(z[7])}`; $("rndTo").value = `${two(z[8])}:${two(z[9])}`;
   }
   renderRandom();
 }
-function renderRandom() {
-  $("rndToggle").classList.toggle("sel", rnd.on);
-  dayPicker("rndDays", rnd.tage, renderRandom);
-}
+function renderRandom() { $("rndToggle").classList.toggle("sel", rnd.on); dayPicker("rndDays", rnd.tage, renderRandom); }
 
 /* ---------- Kontrolllampe ---------- */
 let ledOn = true;
-async function loadConfig() {
-  const c = await send(16);
-  if (c) { ledOn = c[4] === 1; $("ledToggle").classList.toggle("sel", ledOn); }
-}
+async function loadConfig() { const c = await send(16); if (c) { ledOn = c[4] === 1; $("ledToggle").classList.toggle("sel", ledOn); } }
 
 /* ---------- Allgemein ---------- */
 async function run(fn) {
   if (busy) return; busy = true;
   document.querySelectorAll("#app button").forEach(b => b.disabled = true);
-  try { await fn(); } catch (e) { show(e.message || String(e), "err", 7000); }
+  try { await fn(); } catch (e) { show(e.message || String(e), "err", 6000); }
   finally { busy = false; document.querySelectorAll("#app button").forEach(b => b.disabled = false); }
 }
-
 function setConnected(on) {
   $("app").classList.toggle("hidden", !on);
   $("connectCard").classList.toggle("hidden", on);
-  $("devname").textContent = on ? "Verbunden mit " + (device.name || "Clip-Clap") : "Nicht verbunden";
+  $("dot").classList.toggle("live", on);
+  $("devname").textContent = on ? (device.name || "Clip-Clap") : "offline";
   clearInterval(pollTimer);
   if (on) pollTimer = setInterval(() => { if (!document.hidden && !busy) refreshState(); }, 2000);
-  else { clearInterval(cdTimer); waiters = []; chain = Promise.resolve(); }
+  else { clearInterval(cdTimer); waiters = []; chain = Promise.resolve(); document.body.classList.remove("on"); }
 }
-
 async function connect() {
-  if (!navigator.bluetooth) {
-    show("Dieser Browser kann kein Bluetooth. Bitte die Seite in Google Chrome öffnen.", "err", 0); return;
-  }
+  if (!navigator.bluetooth) { show("Dieser Browser kann kein Bluetooth. Bitte die Seite in Google Chrome öffnen.", "err", 0); return; }
   try {
     device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }, { namePrefix: "CLIP" }], optionalServices: [SVC] });
-    device.addEventListener("gattserverdisconnected", () => { setConnected(false); show("Verbindung getrennt.", "info"); });
+    device.addEventListener("gattserverdisconnected", () => { setConnected(false); show("Verbindung getrennt."); });
     show("Verbinde ...", "info", 0);
     const server = await device.gatt.connect();
     const svc = await server.getPrimaryService(SVC);
@@ -536,8 +749,8 @@ async function connect() {
     });
     show("Verbunden. Uhrzeit wurde gestellt.");
   } catch (e) {
-    if (e.name === "NotFoundError") show("Keine Uhr ausgewählt. Ist die Clip-Clap-App auf dem Handy geschlossen?", "err", 7000);
-    else show("Verbindung fehlgeschlagen: " + e.message, "err", 7000);
+    if (e.name === "NotFoundError") show("Keine Uhr ausgewählt. Ist die alte App geschlossen?", "err", 6000);
+    else show("Verbindung fehlgeschlagen: " + e.message, "err", 6000);
   }
 }
 
@@ -563,11 +776,13 @@ segment("segAction", v => form.ein = v === "1");
 segment("segRepeat", v => { form.week = v === "week"; $("weekBox").classList.toggle("hidden", !form.week); $("onceBox").classList.toggle("hidden", form.week); });
 segment("segEnergy", v => { energyView = v; renderEnergy(); });
 segment("segCd", v => cdChoice = Number(v));
-document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => {
-  form.tage = new Set(b.dataset.q.slice(5).split(",")); renderDays();
+document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => { form.tage = new Set(b.dataset.q.slice(5).split(",")); renderDays(); });
+document.querySelectorAll("[data-cd]").forEach(b => b.onclick = () => {
+  const m = Number(b.dataset.cd); $("cdH").value = Math.floor(m / 60); $("cdM").value = m % 60;
 });
-renderDays(); renderRandom(); renderEnergy();
+renderDays(); renderRandom(); renderEnergy(); renderChips(); renderDial();
 $("date").valueAsDate = new Date();
+setInterval(() => { if (!$("app").classList.contains("hidden")) { renderDial(); renderNext(); } }, 60000);
 
 $("btnSave").onclick = () => run(async () => {
   if (rules.length >= MAX) throw new Error("Die Uhr speichert höchstens 12 Programme. Bitte zuerst eines löschen.");
@@ -585,38 +800,32 @@ $("btnSave").onclick = () => run(async () => {
   let nr = 1; while (used.has(nr)) nr++;
   await setRule(0, { nr, aktiv: true, ein: form.ein, tage, datum: [d.getFullYear() - 2000, d.getMonth() + 1, d.getDate(), hh, mi] });
   await refreshRules();
+  $("addBox").open = false;
   show(`Gespeichert: ${form.ein ? "Einschalten" : "Ausschalten"} um ${two(hh)}:${two(mi)}.`);
 });
-
 $("btnCdStart").onclick = () => run(async () => {
   const s = (parseInt($("cdH").value) || 0) * 3600 + (parseInt($("cdM").value) || 0) * 60;
   if (s <= 0) throw new Error("Bitte eine Dauer eingeben.");
+  store.set("clipclap-cd-total", String(s));
   if (!(await send(8, countdownPayload(cdChoice, s)))) throw new Error("Die Uhr hat nicht geantwortet.");
-  await loadCountdown();
-  show("Countdown läuft.");
+  await loadCountdown(); show("Countdown läuft.");
 });
-$("btnCdStop").onclick = () => run(async () => {
-  await send(8, countdownPayload(0, 0)); await loadCountdown(); show("Countdown gestoppt.");
-});
-
+$("btnCdStop").onclick = () => run(async () => { await send(8, countdownPayload(0, 0)); await loadCountdown(); show("Countdown gestoppt."); });
 $("rndToggle").onclick = () => { rnd.on = !rnd.on; renderRandom(); };
 $("btnRnd").onclick = () => run(async () => {
   const [fh, fm] = $("rndFrom").value.split(":").map(Number), [th, tm] = $("rndTo").value.split(":").map(Number);
   if (rnd.on && !rnd.tage.size) throw new Error("Bitte mindestens einen Wochentag wählen.");
   if (!(await send(21, [rnd.on ? 1 : 0, bits(rnd.tage), fh, fm, th, tm]))) throw new Error("Die Uhr hat nicht geantwortet.");
-  await loadRandom();
-  show(rnd.on ? "Zufallsschaltung gespeichert und eingeschaltet." : "Zufallsschaltung ausgeschaltet.");
+  await loadRandom(); show(rnd.on ? "Ferienmodus gespeichert und eingeschaltet." : "Ferienmodus ausgeschaltet.");
 });
-
 $("ledToggle").onclick = () => run(async () => {
   if (!(await send(15, [1, ledOn ? 0 : 1, 0]))) throw new Error("Die Uhr hat nicht geantwortet.");
   await loadConfig();
 });
-
 $("btnConnect").onclick = connect;
 $("btnOn").onclick = () => run(async () => { await send(3, [1, 0, 0]); await refreshState(); });
 $("btnOff").onclick = () => run(async () => { await send(3, [0, 0, 0]); await refreshState(); });
-$("btnTime").onclick = () => run(async () => { show((await setClock()) ? "Uhrzeit gestellt." : "Keine Bestätigung der Uhr.", "info"); });
+$("btnTime").onclick = () => run(async () => { show((await setClock()) ? "Uhrzeit gestellt." : "Keine Bestätigung der Uhr."); });
 $("btnDisconnect").onclick = () => { if (device && device.gatt.connected) device.gatt.disconnect(); };
 </script>
 </body>
