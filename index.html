@@ -8,13 +8,13 @@
 <style>
   :root {
     --bg: #f4f5f2; --card: #ffffff; --text: #1c2321; --muted: #66706c;
-    --line: #dde1dd; --accent: #1f6f5c; --accent-soft: #e3f0ec;
-    --on: #1f8a4c; --off: #8a3b2f; --warn: #b5651d; --on-accent: #ffffff;
+    --line: #dde1dd; --accent: #1f6f5c; --accent-soft: #e3f0ec; --on-accent: #ffffff;
+    --on: #1f8a4c; --off: #8a3b2f; --track: #e3e7e4;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #121614; --card: #1c2220; --text: #e8ece9; --muted: #9aa5a0;
-      --line: #2e3633; --accent: #5cc2a5; --accent-soft: #1f3a33;
-      --on: #4cc27e; --off: #e07a68; --warn: #e3a35a; --on-accent: #0d1f1a; }
+      --line: #2e3633; --accent: #5cc2a5; --accent-soft: #1f3a33; --on-accent: #0d1f1a;
+      --on: #4cc27e; --off: #e07a68; --track: #2a3330; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
@@ -50,8 +50,9 @@
   .days-pick button { padding: 10px 0; background: var(--accent-soft); color: var(--accent); font-weight: 600; min-height: 44px; }
   .days-pick button.sel { background: var(--accent); color: var(--on-accent); }
   label { display: block; font-size: 14px; color: var(--muted); margin: 14px 0 6px; }
-  input[type=time], input[type=date] { font: inherit; font-size: 20px; padding: 10px 12px; border-radius: 10px;
+  input[type=time], input[type=date], input[type=number] { font: inherit; font-size: 20px; padding: 10px 12px; border-radius: 10px;
     border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .msg { padding: 12px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 15px; display: none; }
   .msg.show { display: block; }
   .msg.info { background: var(--accent-soft); color: var(--text); }
@@ -59,6 +60,31 @@
   .hidden { display: none !important; }
   .muted { color: var(--muted); font-size: 15px; }
   .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+  /* Wattanzeige */
+  .gauge { display: block; width: 100%; max-width: 300px; margin: 4px auto 0; }
+  .gauge .track { stroke: var(--track); }
+  .gauge .value { stroke: var(--accent); transition: stroke-dasharray .6s ease; }
+  .gauge .tick { fill: var(--muted); font-size: 11px; }
+  .gauge .watt { fill: var(--text); font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .gauge .unit { fill: var(--muted); font-size: 15px; }
+  .gauge .needle { stroke: var(--text); stroke-width: 3; stroke-linecap: round; transition: transform .6s ease; }
+
+  /* Verbrauch */
+  .bars { display: flex; align-items: flex-end; gap: 2px; height: 140px; margin-top: 12px;
+    border-bottom: 1px solid var(--line); }
+  .bars div { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 1px; opacity: .9; }
+  .bars div.zero { background: var(--track); }
+  .axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .total { display: flex; gap: 18px; margin-top: 12px; }
+  .total b { font-size: 22px; display: block; font-variant-numeric: tabular-nums; }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; }
+  .toggle { flex-shrink: 0; width: 54px; min-height: 32px; height: 32px; padding: 0; border-radius: 99px; background: var(--track); position: relative; }
+  .toggle::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%;
+    background: #fff; transition: left .2s; }
+  .toggle.sel { background: var(--accent); }
+  .toggle.sel::after { left: 26px; }
+  .countdown { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -75,17 +101,46 @@
   </section>
 
   <div id="app" class="hidden">
+    <!-- Steckdose und Wattanzeige -->
     <section class="card">
       <div class="row">
         <div class="grow">
           <div class="muted">Steckdose jetzt</div>
           <div class="state" id="state">?</div>
         </div>
-        <button id="btnOn">Ein</button>
-        <button id="btnOff" class="ghost">Aus</button>
+        <button class="ghost" id="btnOn">Ein</button>
+        <button class="ghost" id="btnOff">Aus</button>
       </div>
+      <svg class="gauge" viewBox="0 0 240 200" aria-label="Aktuelle Leistung">
+        <path id="gTrack" class="track" fill="none" stroke-width="16" stroke-linecap="round"/>
+        <path id="gValue" class="value" fill="none" stroke-width="16" stroke-linecap="round"/>
+        <g id="gTicks"></g>
+        <line id="gNeedle" class="needle" x1="120" y1="120" x2="120" y2="52"/>
+        <circle cx="120" cy="120" r="6" fill="var(--text)"/>
+        <text id="gWatt" class="watt" x="120" y="172" text-anchor="middle">0</text>
+        <text class="unit" x="120" y="192" text-anchor="middle">Watt</text>
+      </svg>
     </section>
 
+    <!-- Verbrauch -->
+    <section class="card">
+      <h2>Stromverbrauch</h2>
+      <div class="seg" id="segEnergy">
+        <button data-v="day" class="sel">24 Std.</button>
+        <button data-v="week">7 Tage</button>
+        <button data-v="month">30 Tage</button>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="axis" id="axis"></div>
+      <div class="total">
+        <div><span class="muted">Verbrauch</span><b id="eTotal">0</b></div>
+        <div id="costBox"><span class="muted">Kosten</span><b id="eCost">?</b></div>
+      </div>
+      <label for="price">Strompreis in Rappen pro kWh (für die Kostenberechnung)</label>
+      <input type="number" id="price" inputmode="decimal" min="0" step="0.1" placeholder="z.B. 29">
+    </section>
+
+    <!-- Zeitprogramme -->
     <section class="card">
       <div class="row" style="margin-bottom:4px">
         <h2 class="grow" style="margin:0">Zeitprogramme</h2>
@@ -100,36 +155,75 @@
         <button data-v="1" class="sel">Einschalten</button>
         <button data-v="0">Ausschalten</button>
       </div>
-
       <label for="time">Uhrzeit</label>
       <input type="time" id="time" value="07:00">
-
       <label>Wie oft</label>
       <div class="seg" id="segRepeat">
         <button data-v="week" class="sel">Jede Woche</button>
         <button data-v="once">Einmalig</button>
       </div>
-
       <div id="weekBox">
         <label>Wochentage</label>
         <div class="days-pick" id="days"></div>
         <div class="quick">
-          <button class="small ghost" data-q="Mo,Di,Mi,Do,Fr">Mo bis Fr</button>
-          <button class="small ghost" data-q="Sa,So">Wochenende</button>
-          <button class="small ghost" data-q="Mo,Di,Mi,Do,Fr,Sa,So">Jeden Tag</button>
+          <button class="small ghost" data-q="days:Mo,Di,Mi,Do,Fr">Mo bis Fr</button>
+          <button class="small ghost" data-q="days:Sa,So">Wochenende</button>
+          <button class="small ghost" data-q="days:Mo,Di,Mi,Do,Fr,Sa,So">Jeden Tag</button>
         </div>
       </div>
       <div id="onceBox" class="hidden">
         <label for="date">Datum</label>
         <input type="date" id="date">
       </div>
-
       <button class="big" id="btnSave" style="margin-top:18px">Programm speichern</button>
     </section>
 
+    <!-- Countdown -->
+    <section class="card">
+      <h2>Countdown</h2>
+      <div id="cdRunning" class="hidden">
+        <div class="muted" id="cdText"></div>
+        <div class="countdown" id="cdLeft">00:00:00</div>
+        <button class="ghost big" id="btnCdStop" style="margin-top:10px">Countdown stoppen</button>
+      </div>
+      <div id="cdForm">
+        <p class="muted" style="margin-top:0">Schaltet die Steckdose nach Ablauf der Zeit einmalig.</p>
+        <div class="seg" id="segCd">
+          <button data-v="2" class="sel">Danach aus</button>
+          <button data-v="1">Danach ein</button>
+        </div>
+        <div class="two">
+          <div><label for="cdH">Stunden</label><input type="number" id="cdH" min="0" max="99" value="1" inputmode="numeric"></div>
+          <div><label for="cdM">Minuten</label><input type="number" id="cdM" min="0" max="59" value="0" inputmode="numeric"></div>
+        </div>
+        <button class="big" id="btnCdStart" style="margin-top:14px">Countdown starten</button>
+      </div>
+    </section>
+
+    <!-- Zufall -->
+    <section class="card">
+      <div class="switch">
+        <div><h2 style="margin:0">Zufallsschaltung</h2>
+          <div class="muted">Ferienmodus: schaltet im Zeitfenster zufällig ein und aus, damit das Haus bewohnt wirkt.</div></div>
+        <button class="toggle" id="rndToggle" aria-label="Zufallsschaltung ein oder aus"></button>
+      </div>
+      <label>Wochentage</label>
+      <div class="days-pick" id="rndDays"></div>
+      <div class="two">
+        <div><label for="rndFrom">Von</label><input type="time" id="rndFrom" value="18:00"></div>
+        <div><label for="rndTo">Bis</label><input type="time" id="rndTo" value="23:00"></div>
+      </div>
+      <button class="big" id="btnRnd" style="margin-top:14px">Zufallsschaltung speichern</button>
+    </section>
+
+    <!-- Weiteres -->
     <section class="card">
       <h2>Weiteres</h2>
-      <div class="row">
+      <div class="switch">
+        <div>Kontrolllampe an der Steckdose</div>
+        <button class="toggle" id="ledToggle" aria-label="Kontrolllampe"></button>
+      </div>
+      <div class="row" style="margin-top:10px">
         <button class="ghost grow" id="btnTime">Uhrzeit der Uhr stellen</button>
         <button class="ghost grow" id="btnDisconnect">Trennen</button>
       </div>
@@ -149,7 +243,13 @@ const ANZEIGE = ["Mo","Di","Mi","Do","Fr","Sa","So"];    // Reihenfolge auf dem 
 const MAX = 12;
 
 let device = null, chW = null, buf = [], waiters = [], rules = [], busy = false;
+let chain = Promise.resolve(), pollTimer = null, cdTimer = null;
 const $ = id => document.getElementById(id);
+const two = n => String(n).padStart(2, "0");
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+};
 
 /* ---------- Protokoll ---------- */
 function frame(cmd, payload = [0, 0]) {
@@ -172,22 +272,21 @@ function onNotify(ev) {
   }
 }
 
-async function send(cmd, payload, timeout = 3000) {
-  const p = new Promise(res => {
+// Befehle laufen nacheinander, damit sich Abfragen nicht in die Quere kommen.
+function send(cmd, payload, timeout = 3000) {
+  const job = chain.then(() => new Promise(async res => {
     const w = { cmd, res };
     w.t = setTimeout(() => { waiters = waiters.filter(x => x !== w); res(null); }, timeout);
     waiters.push(w);
-  });
-  await chW.writeValueWithoutResponse(frame(cmd, payload));
-  return p;
+    try { await chW.writeValueWithoutResponse(frame(cmd, payload)); }
+    catch (e) { clearTimeout(w.t); waiters = waiters.filter(x => x !== w); res(null); }
+  }));
+  chain = job.catch(() => {});
+  return job;
 }
 
-function decodeRule(b) {
-  return { nr: b[0], aktiv: b[1] === 1, ein: b[2] === 1, tage: b[3], datum: b.slice(4, 9) };
-}
-function encodeRule(r) {
-  return [r.nr, r.aktiv ? 1 : 0, r.ein ? 1 : 0, r.tage, ...r.datum];
-}
+const decodeRule = b => ({ nr: b[0], aktiv: b[1] === 1, ein: b[2] === 1, tage: b[3], datum: b.slice(4, 9) });
+const encodeRule = r => [r.nr, r.aktiv ? 1 : 0, r.ein ? 1 : 0, r.tage, ...r.datum];
 
 async function readRules() {
   const all = [];
@@ -207,17 +306,106 @@ async function setRule(mode, r) {              // 0 neu, 1 aendern, 2 loeschen
   if (a[4] !== 0) throw new Error("Die Uhr hat den Befehl abgelehnt.");
 }
 
-async function setClock() {
+function setClock() {
   const t = new Date(), y = t.getFullYear();
   return send(1, [t.getSeconds(), t.getMinutes(), t.getHours(), t.getDate(), t.getMonth() + 1, y >> 8, y & 255, 0, 0]);
 }
 
-/* ---------- Oberfläche ---------- */
+/* ---------- Meldungen ---------- */
 function show(text, kind = "info", ms = 4000) {
   const m = $("msg"); m.textContent = text; m.className = "msg show " + kind;
   clearTimeout(show.t); if (ms) show.t = setTimeout(() => m.className = "msg", ms);
 }
-const two = n => String(n).padStart(2, "0");
+
+/* ---------- Wattanzeige (Skala wie in der Original-App) ---------- */
+const CX = 120, CY = 120, R = 88, START = -140, SWEEP = 280;
+const pt = (deg, r = R) => { const a = deg * Math.PI / 180; return [CX + r * Math.sin(a), CY - r * Math.cos(a)]; };
+function arcPath(from, to) {
+  const [x1, y1] = pt(from), [x2, y2] = pt(to);
+  return `M${x1.toFixed(1)} ${y1.toFixed(1)} A${R} ${R} 0 ${to - from > 180 ? 1 : 0} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+}
+let scale = null;
+function setScale(steps) {
+  if (scale && scale.join() === steps.join()) return;
+  scale = steps;
+  const g = $("gTicks"); g.innerHTML = "";
+  steps.forEach((v, i) => {
+    const [x, y] = pt(START + i * SWEEP / 4, R - 26);
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.setAttribute("x", x.toFixed(1)); t.setAttribute("y", (y + 4).toFixed(1));
+    t.setAttribute("text-anchor", "middle"); t.setAttribute("class", "tick");
+    t.textContent = v; g.appendChild(t);
+  });
+}
+function wattToDeg(w) {
+  const s = scale;
+  if (w <= 0) return 0;
+  for (let i = 0; i < 4; i++) {
+    if (w <= s[i + 1]) return (i + (w - s[i]) / (s[i + 1] - s[i])) * SWEEP / 4;
+  }
+  return SWEEP;
+}
+function showWatt(w) {
+  setScale(w > 1500 ? [0, 30, 300, 1500, 4500] : [0, 10, 100, 500, 1500]);
+  const deg = wattToDeg(w);
+  $("gValue").setAttribute("d", deg > 0.5 ? arcPath(START, START + deg) : "");
+  $("gNeedle").style.transform = `rotate(${START + deg}deg)`;
+  $("gNeedle").style.transformOrigin = "120px 120px";
+  $("gWatt").textContent = w < 10 ? w.toFixed(1) : Math.round(w).toLocaleString("de-CH");
+}
+$("gTrack").setAttribute("d", arcPath(START, START + SWEEP));
+showWatt(0);
+
+/* ---------- Steckdose ---------- */
+async function refreshState() {
+  const s = await send(4);
+  if (!s) return;
+  const on = s[4] === 1;
+  $("state").textContent = on ? "EIN" : "AUS"; $("state").className = "state " + (on ? "on" : "off");
+  showWatt((((s[6] << 24) | (s[7] << 16) | (s[8] << 8) | s[9]) >>> 0) / 1000);
+}
+
+/* ---------- Verbrauch ---------- */
+let energyView = "day", energyData = { day: null, month: null };
+async function loadEnergy() {
+  const d = await send(10, [0, 0], 4000);
+  if (d) energyData.day = Array.from({ length: 24 }, (_, i) => d[4 + 2 * i] * 256 + d[5 + 2 * i]);
+  const m = await send(11, [0, 0], 4000);
+  if (m) energyData.month = Array.from({ length: 30 }, (_, i) =>
+    ((m[4 + 4 * i] << 24) | (m[5 + 4 * i] << 16) | (m[6 + 4 * i] << 8) | m[7 + 4 * i]) >>> 0);
+  renderEnergy();
+}
+function fmtEnergy(wh) {
+  return wh >= 1000 ? (wh / 1000).toLocaleString("de-CH", { maximumFractionDigits: 2 }) + " kWh"
+                    : Math.round(wh) + " Wh";
+}
+function renderEnergy() {
+  let vals, labels;
+  const now = new Date();
+  if (energyView === "day") {
+    vals = (energyData.day || Array(24).fill(0)).map(v => v === 0xFFFF ? 0 : v);
+    const h = now.getHours();
+    labels = [two((h + 1) % 24) + ":00", two((h + 13) % 24) + ":00", "jetzt"];
+  } else {
+    const n = energyView === "week" ? 7 : 30;
+    vals = (energyData.month || Array(30).fill(0)).slice(30 - n).map(v => v === 0xFFFFFFFF ? 0 : v);
+    const first = new Date(now); first.setDate(now.getDate() - (n - 1));
+    labels = [`${first.getDate()}.${first.getMonth() + 1}.`, "heute"];
+  }
+  const max = Math.max(...vals, 1);
+  $("bars").innerHTML = vals.map(v =>
+    `<div class="${v ? "" : "zero"}" style="height:${v ? Math.max(2, v / max * 100) : 1}%" title="${fmtEnergy(v)}"></div>`).join("");
+  $("axis").innerHTML = labels.map(l => `<span>${l}</span>`).join("");
+  const total = vals.reduce((a, b) => a + b, 0);
+  $("eTotal").textContent = fmtEnergy(total);
+  const price = parseFloat($("price").value);
+  $("eCost").textContent = isNaN(price) ? "Preis fehlt"
+    : "CHF " + (total / 1000 * price / 100).toLocaleString("de-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+$("price").value = store.get("clipclap-price") || "";
+$("price").oninput = () => { store.set("clipclap-price", $("price").value); renderEnergy(); };
+
+/* ---------- Zeitprogramme ---------- */
 function daysText(bits) {
   const sel = ANZEIGE.filter(t => bits & (1 << TAGE.indexOf(t)));
   if (sel.length === 7) return "Jeden Tag";
@@ -225,7 +413,7 @@ function daysText(bits) {
   if (sel.join() === "Sa,So") return "Wochenende";
   return sel.join(", ");
 }
-function ruleMinutes(r) { return r.datum[3] * 60 + r.datum[4]; }
+const ruleMinutes = r => r.datum[3] * 60 + r.datum[4];
 
 function renderRules() {
   $("count").textContent = rules.length + " von " + MAX;
@@ -241,24 +429,74 @@ function renderRules() {
       <div class="grow"><div class="when">${two(hh)}:${two(mi)}</div><div class="days">${days}${r.aktiv ? "" : " (pausiert)"}</div></div>
       <button class="small ghost" data-act="toggle">${r.aktiv ? "Pause" : "Aktiv"}</button>
       <button class="small ghost" data-act="del">Löschen</button>`;
-    row.querySelector('[data-act=toggle]').onclick = () => run(async () => {
-      await setRule(1, { ...r, aktiv: !r.aktiv }); await refresh();
+    row.querySelector("[data-act=toggle]").onclick = () => run(async () => {
+      await setRule(1, { ...r, aktiv: !r.aktiv }); await refreshRules();
       show(r.aktiv ? "Programm pausiert." : "Programm wieder aktiv.");
     });
-    row.querySelector('[data-act=del]').onclick = () => {
+    row.querySelector("[data-act=del]").onclick = () => {
       if (!confirm(`Programm ${r.ein ? "EIN" : "AUS"} um ${two(hh)}:${two(mi)} löschen?`)) return;
-      run(async () => { await setRule(2, r); await refresh(); show("Programm gelöscht."); });
+      run(async () => { await setRule(2, r); await refreshRules(); show("Programm gelöscht."); });
     };
     list.appendChild(row);
   });
 }
+async function refreshRules() { rules = await readRules(); renderRules(); }
 
-async function refreshState() {
-  const s = await send(4);
-  if (s) { const on = s[4] === 1; $("state").textContent = on ? "EIN" : "AUS"; $("state").className = "state " + (on ? "on" : "off"); }
+/* ---------- Countdown ---------- */
+let cdTarget = null, cdMode = 0;
+async function loadCountdown() {
+  const c = await send(9);
+  if (!c) return;
+  cdMode = c[4];
+  cdTarget = cdMode ? new Date(2000 + c[10], c[9] - 1, c[8], c[7], c[6], c[5]) : null;
+  renderCountdown();
 }
-async function refresh() { rules = await readRules(); renderRules(); await refreshState(); }
+function renderCountdown() {
+  clearInterval(cdTimer);
+  const running = cdTarget && cdTarget > new Date();
+  $("cdRunning").classList.toggle("hidden", !running);
+  $("cdForm").classList.toggle("hidden", running);
+  if (!running) return;
+  $("cdText").textContent = cdMode === 1 ? "Steckdose wird eingeschaltet in" : "Steckdose wird ausgeschaltet in";
+  const tick = () => {
+    const s = Math.max(0, Math.round((cdTarget - new Date()) / 1000));
+    $("cdLeft").textContent = `${two(Math.floor(s / 3600))}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}`;
+    if (s === 0) { clearInterval(cdTimer); setTimeout(() => { loadCountdown(); refreshState(); }, 2500); }
+  };
+  tick(); cdTimer = setInterval(tick, 1000);
+}
+function countdownPayload(mode, seconds) {
+  const t = new Date(Date.now() + (seconds + 1) * 1000);
+  return [mode, t.getSeconds(), t.getMinutes(), t.getHours(), t.getDate(), t.getMonth() + 1, t.getFullYear() - 2000, 0, 0, 0, 0];
+}
+let cdChoice = 2;
 
+/* ---------- Zufall ---------- */
+const rnd = { on: false, tage: new Set(["Mo","Di","Mi","Do","Fr","Sa","So"]) };
+async function loadRandom() {
+  const z = await send(22);
+  if (!z) return;
+  rnd.on = z[4] === 1;
+  if (rnd.on) {   // Die Uhr vergisst Tage und Zeiten, wenn die Funktion aus ist.
+    rnd.tage = new Set(TAGE.filter((t, i) => z[5] & (1 << i)));
+    $("rndFrom").value = `${two(z[6])}:${two(z[7])}`;
+    $("rndTo").value = `${two(z[8])}:${two(z[9])}`;
+  }
+  renderRandom();
+}
+function renderRandom() {
+  $("rndToggle").classList.toggle("sel", rnd.on);
+  dayPicker("rndDays", rnd.tage, renderRandom);
+}
+
+/* ---------- Kontrolllampe ---------- */
+let ledOn = true;
+async function loadConfig() {
+  const c = await send(16);
+  if (c) { ledOn = c[4] === 1; $("ledToggle").classList.toggle("sel", ledOn); }
+}
+
+/* ---------- Allgemein ---------- */
 async function run(fn) {
   if (busy) return; busy = true;
   document.querySelectorAll("#app button").forEach(b => b.disabled = true);
@@ -270,6 +508,9 @@ function setConnected(on) {
   $("app").classList.toggle("hidden", !on);
   $("connectCard").classList.toggle("hidden", on);
   $("devname").textContent = on ? "Verbunden mit " + (device.name || "Clip-Clap") : "Nicht verbunden";
+  clearInterval(pollTimer);
+  if (on) pollTimer = setInterval(() => { if (!document.hidden && !busy) refreshState(); }, 2000);
+  else { clearInterval(cdTimer); waiters = []; chain = Promise.resolve(); }
 }
 
 async function connect() {
@@ -289,7 +530,10 @@ async function connect() {
     await send(23, [0, ...PASSWORT.split("").map(Number), 0, 0, 0, 0]);
     await setClock();
     setConnected(true);
-    await run(refresh);
+    await run(async () => {
+      await refreshState(); await refreshRules(); await loadEnergy();
+      await loadCountdown(); await loadRandom(); await loadConfig();
+    });
     show("Verbunden. Uhrzeit wurde gestellt.");
   } catch (e) {
     if (e.name === "NotFoundError") show("Keine Uhr ausgewählt. Ist die Clip-Clap-App auf dem Handy geschlossen?", "err", 7000);
@@ -297,25 +541,32 @@ async function connect() {
   }
 }
 
-/* ---------- Formular ---------- */
-const form = { ein: true, week: true, tage: new Set(["Mo","Di","Mi","Do","Fr"]) };
+/* ---------- Bedienelemente ---------- */
 function segment(id, cb) {
   $(id).querySelectorAll("button").forEach(b => b.onclick = () => {
     $(id).querySelectorAll("button").forEach(x => x.classList.toggle("sel", x === b)); cb(b.dataset.v);
   });
 }
-segment("segAction", v => form.ein = v === "1");
-segment("segRepeat", v => { form.week = v === "week"; $("weekBox").classList.toggle("hidden", !form.week); $("onceBox").classList.toggle("hidden", form.week); });
-function renderDays() {
-  $("days").innerHTML = "";
+function dayPicker(id, set, rerender) {
+  $(id).innerHTML = "";
   ANZEIGE.forEach(t => {
-    const b = document.createElement("button"); b.textContent = t; b.className = form.tage.has(t) ? "sel" : "";
-    b.onclick = () => { form.tage.has(t) ? form.tage.delete(t) : form.tage.add(t); renderDays(); };
-    $("days").appendChild(b);
+    const b = document.createElement("button"); b.textContent = t; b.className = set.has(t) ? "sel" : "";
+    b.onclick = () => { set.has(t) ? set.delete(t) : set.add(t); rerender(); };
+    $(id).appendChild(b);
   });
 }
-document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => { form.tage = new Set(b.dataset.q.split(",")); renderDays(); });
-renderDays();
+const bits = set => [...set].reduce((a, t) => a | (1 << TAGE.indexOf(t)), 0);
+
+const form = { ein: true, week: true, tage: new Set(["Mo","Di","Mi","Do","Fr"]) };
+const renderDays = () => dayPicker("days", form.tage, renderDays);
+segment("segAction", v => form.ein = v === "1");
+segment("segRepeat", v => { form.week = v === "week"; $("weekBox").classList.toggle("hidden", !form.week); $("onceBox").classList.toggle("hidden", form.week); });
+segment("segEnergy", v => { energyView = v; renderEnergy(); });
+segment("segCd", v => cdChoice = Number(v));
+document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => {
+  form.tage = new Set(b.dataset.q.slice(5).split(",")); renderDays();
+});
+renderDays(); renderRandom(); renderEnergy();
 $("date").valueAsDate = new Date();
 
 $("btnSave").onclick = () => run(async () => {
@@ -325,7 +576,7 @@ $("btnSave").onclick = () => run(async () => {
   let tage = 0, d = new Date();
   if (form.week) {
     if (!form.tage.size) throw new Error("Bitte mindestens einen Wochentag wählen.");
-    form.tage.forEach(t => tage |= 1 << TAGE.indexOf(t));
+    tage = bits(form.tage);
   } else {
     if (!$("date").value) throw new Error("Bitte ein Datum wählen.");
     const [y, m, dd] = $("date").value.split("-").map(Number); d = new Date(y, m - 1, dd);
@@ -333,8 +584,33 @@ $("btnSave").onclick = () => run(async () => {
   const used = new Set(rules.map(r => r.nr));
   let nr = 1; while (used.has(nr)) nr++;
   await setRule(0, { nr, aktiv: true, ein: form.ein, tage, datum: [d.getFullYear() - 2000, d.getMonth() + 1, d.getDate(), hh, mi] });
-  await refresh();
+  await refreshRules();
   show(`Gespeichert: ${form.ein ? "Einschalten" : "Ausschalten"} um ${two(hh)}:${two(mi)}.`);
+});
+
+$("btnCdStart").onclick = () => run(async () => {
+  const s = (parseInt($("cdH").value) || 0) * 3600 + (parseInt($("cdM").value) || 0) * 60;
+  if (s <= 0) throw new Error("Bitte eine Dauer eingeben.");
+  if (!(await send(8, countdownPayload(cdChoice, s)))) throw new Error("Die Uhr hat nicht geantwortet.");
+  await loadCountdown();
+  show("Countdown läuft.");
+});
+$("btnCdStop").onclick = () => run(async () => {
+  await send(8, countdownPayload(0, 0)); await loadCountdown(); show("Countdown gestoppt.");
+});
+
+$("rndToggle").onclick = () => { rnd.on = !rnd.on; renderRandom(); };
+$("btnRnd").onclick = () => run(async () => {
+  const [fh, fm] = $("rndFrom").value.split(":").map(Number), [th, tm] = $("rndTo").value.split(":").map(Number);
+  if (rnd.on && !rnd.tage.size) throw new Error("Bitte mindestens einen Wochentag wählen.");
+  if (!(await send(21, [rnd.on ? 1 : 0, bits(rnd.tage), fh, fm, th, tm]))) throw new Error("Die Uhr hat nicht geantwortet.");
+  await loadRandom();
+  show(rnd.on ? "Zufallsschaltung gespeichert und eingeschaltet." : "Zufallsschaltung ausgeschaltet.");
+});
+
+$("ledToggle").onclick = () => run(async () => {
+  if (!(await send(15, [1, ledOn ? 0 : 1, 0]))) throw new Error("Die Uhr hat nicht geantwortet.");
+  await loadConfig();
 });
 
 $("btnConnect").onclick = connect;
