@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6f5c">
+<title>Clip-Clap Steuerung</title>
+<style>
+  :root {
+    --bg: #f4f5f2; --card: #ffffff; --text: #1c2321; --muted: #66706c;
+    --line: #dde1dd; --accent: #1f6f5c; --accent-soft: #e3f0ec;
+    --on: #1f8a4c; --off: #8a3b2f; --warn: #b5651d; --on-accent: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #121614; --card: #1c2220; --text: #e8ece9; --muted: #9aa5a0;
+      --line: #2e3633; --accent: #5cc2a5; --accent-soft: #1f3a33;
+      --on: #4cc27e; --off: #e07a68; --warn: #e3a35a; --on-accent: #0d1f1a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 16px 16px 48px; }
+  h1 { font-size: 22px; margin: 8px 0 2px; }
+  h2 { font-size: 17px; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 16px; font-size: 15px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px; margin-bottom: 14px; }
+  button { font: inherit; border: 0; border-radius: 10px; padding: 12px 16px; cursor: pointer;
+    background: var(--accent); color: var(--on-accent); font-weight: 600; min-height: 48px; }
+  button.ghost { background: var(--accent-soft); color: var(--accent); }
+  button.small { min-height: 38px; padding: 6px 12px; font-size: 15px; }
+  button:disabled { opacity: .45; cursor: default; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; }
+  .big { width: 100%; }
+  .state { font-size: 28px; font-weight: 700; }
+  .state.on { color: var(--on); } .state.off { color: var(--off); }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 14px; font-weight: 700; }
+  .pill.on { background: color-mix(in srgb, var(--on) 18%, transparent); color: var(--on); }
+  .pill.off { background: color-mix(in srgb, var(--off) 18%, transparent); color: var(--off); }
+  .prog { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .prog:first-child { border-top: 0; }
+  .prog .when { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .prog .days { color: var(--muted); font-size: 15px; }
+  .prog.paused .when, .prog.paused .days { opacity: .5; text-decoration: line-through; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { flex: 1; border-radius: 0; background: transparent; color: var(--text); font-weight: 500; }
+  .seg button.sel { background: var(--accent); color: var(--on-accent); }
+  .days-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .days-pick button { padding: 10px 0; background: var(--accent-soft); color: var(--accent); font-weight: 600; min-height: 44px; }
+  .days-pick button.sel { background: var(--accent); color: var(--on-accent); }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 14px 0 6px; }
+  input[type=time], input[type=date] { font: inherit; font-size: 20px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; }
+  .msg { padding: 12px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 15px; display: none; }
+  .msg.show { display: block; }
+  .msg.info { background: var(--accent-soft); color: var(--text); }
+  .msg.err { background: color-mix(in srgb, var(--off) 15%, transparent); color: var(--text); }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); font-size: 15px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Clip-Clap Zeitschaltuhr</h1>
+  <p class="sub" id="devname">Nicht verbunden</p>
+
+  <div class="msg" id="msg"></div>
+
+  <section class="card" id="connectCard">
+    <h2>Verbinden</h2>
+    <p class="muted">Die Clip-Clap-App auf dem Handy muss geschlossen sein. Die Uhr spricht immer nur mit einem Gerät.</p>
+    <button class="big" id="btnConnect">Mit Zeitschaltuhr verbinden</button>
+  </section>
+
+  <div id="app" class="hidden">
+    <section class="card">
+      <div class="row">
+        <div class="grow">
+          <div class="muted">Steckdose jetzt</div>
+          <div class="state" id="state">?</div>
+        </div>
+        <button id="btnOn">Ein</button>
+        <button id="btnOff" class="ghost">Aus</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row" style="margin-bottom:4px">
+        <h2 class="grow" style="margin:0">Zeitprogramme</h2>
+        <span class="muted" id="count"></span>
+      </div>
+      <div id="list"><p class="muted">Wird geladen ...</p></div>
+    </section>
+
+    <section class="card">
+      <h2>Neues Programm</h2>
+      <div class="seg" id="segAction">
+        <button data-v="1" class="sel">Einschalten</button>
+        <button data-v="0">Ausschalten</button>
+      </div>
+
+      <label for="time">Uhrzeit</label>
+      <input type="time" id="time" value="07:00">
+
+      <label>Wie oft</label>
+      <div class="seg" id="segRepeat">
+        <button data-v="week" class="sel">Jede Woche</button>
+        <button data-v="once">Einmalig</button>
+      </div>
+
+      <div id="weekBox">
+        <label>Wochentage</label>
+        <div class="days-pick" id="days"></div>
+        <div class="quick">
+          <button class="small ghost" data-q="Mo,Di,Mi,Do,Fr">Mo bis Fr</button>
+          <button class="small ghost" data-q="Sa,So">Wochenende</button>
+          <button class="small ghost" data-q="Mo,Di,Mi,Do,Fr,Sa,So">Jeden Tag</button>
+        </div>
+      </div>
+      <div id="onceBox" class="hidden">
+        <label for="date">Datum</label>
+        <input type="date" id="date">
+      </div>
+
+      <button class="big" id="btnSave" style="margin-top:18px">Programm speichern</button>
+    </section>
+
+    <section class="card">
+      <h2>Weiteres</h2>
+      <div class="row">
+        <button class="ghost grow" id="btnTime">Uhrzeit der Uhr stellen</button>
+        <button class="ghost grow" id="btnDisconnect">Trennen</button>
+      </div>
+      <p class="muted" style="margin-bottom:0">Die Uhrzeit wird beim Verbinden automatisch gestellt. Höchstens 12 Programme.</p>
+    </section>
+  </div>
+</main>
+
+<script>
+"use strict";
+const SVC = "0000fff0-0000-1000-8000-00805f9b34fb";
+const W   = "0000fff3-0000-1000-8000-00805f9b34fb";
+const N   = "0000fff4-0000-1000-8000-00805f9b34fb";
+const PASSWORT = "0000";
+const TAGE = ["So","Mo","Di","Mi","Do","Fr","Sa"];       // Bit 0 = So ... Bit 6 = Sa
+const ANZEIGE = ["Mo","Di","Mi","Do","Fr","Sa","So"];    // Reihenfolge auf dem Bildschirm
+const MAX = 12;
+
+let device = null, chW = null, buf = [], waiters = [], rules = [], busy = false;
+const $ = id => document.getElementById(id);
+
+/* ---------- Protokoll ---------- */
+function frame(cmd, payload = [0, 0]) {
+  const f = new Uint8Array(payload.length + 7);
+  f[0] = 0x0F; f[1] = payload.length + 3; f[2] = cmd; f[3] = 0;
+  f.set(payload, 4);
+  let c = 1;
+  for (let i = 2; i < f.length - 3; i++) c += f[i];
+  f[f.length - 3] = c & 0xFF; f[f.length - 2] = 0xFF; f[f.length - 1] = 0xFF;
+  return f;
+}
+
+function onNotify(ev) {
+  const d = Array.from(new Uint8Array(ev.target.value.buffer));
+  buf = d[0] === 0x0F ? d : buf.concat(d);
+  if (buf.length >= 2 && buf.length >= buf[1] + 4) {
+    const msg = buf.slice(0, buf[1] + 4); buf = [];
+    const i = waiters.findIndex(w => w.cmd === msg[2]);
+    if (i >= 0) { const w = waiters.splice(i, 1)[0]; clearTimeout(w.t); w.res(msg); }
+  }
+}
+
+async function send(cmd, payload, timeout = 3000) {
+  const p = new Promise(res => {
+    const w = { cmd, res };
+    w.t = setTimeout(() => { waiters = waiters.filter(x => x !== w); res(null); }, timeout);
+    waiters.push(w);
+  });
+  await chW.writeValueWithoutResponse(frame(cmd, payload));
+  return p;
+}
+
+function decodeRule(b) {
+  return { nr: b[0], aktiv: b[1] === 1, ein: b[2] === 1, tage: b[3], datum: b.slice(4, 9) };
+}
+function encodeRule(r) {
+  return [r.nr, r.aktiv ? 1 : 0, r.ein ? 1 : 0, r.tage, ...r.datum];
+}
+
+async function readRules() {
+  const all = [];
+  for (let page = 0; page < 7; page++) {
+    const a = await send(20, [page, 0, 0]);
+    if (!a) break;
+    const total = a[4];
+    for (let i = 0; i < Math.floor((a[1] - 4) / 12); i++) all.push(decodeRule(a.slice(5 + 12 * i, 17 + 12 * i)));
+    if (all.length >= total) break;
+  }
+  return all;
+}
+
+async function setRule(mode, r) {              // 0 neu, 1 aendern, 2 loeschen
+  const a = await send(19, [mode, ...encodeRule(r)]);
+  if (!a) throw new Error("Die Uhr hat nicht geantwortet.");
+  if (a[4] !== 0) throw new Error("Die Uhr hat den Befehl abgelehnt.");
+}
+
+async function setClock() {
+  const t = new Date(), y = t.getFullYear();
+  return send(1, [t.getSeconds(), t.getMinutes(), t.getHours(), t.getDate(), t.getMonth() + 1, y >> 8, y & 255, 0, 0]);
+}
+
+/* ---------- Oberfläche ---------- */
+function show(text, kind = "info", ms = 4000) {
+  const m = $("msg"); m.textContent = text; m.className = "msg show " + kind;
+  clearTimeout(show.t); if (ms) show.t = setTimeout(() => m.className = "msg", ms);
+}
+const two = n => String(n).padStart(2, "0");
+function daysText(bits) {
+  const sel = ANZEIGE.filter(t => bits & (1 << TAGE.indexOf(t)));
+  if (sel.length === 7) return "Jeden Tag";
+  if (sel.join() === "Mo,Di,Mi,Do,Fr") return "Mo bis Fr";
+  if (sel.join() === "Sa,So") return "Wochenende";
+  return sel.join(", ");
+}
+function ruleMinutes(r) { return r.datum[3] * 60 + r.datum[4]; }
+
+function renderRules() {
+  $("count").textContent = rules.length + " von " + MAX;
+  const list = $("list"); list.innerHTML = "";
+  if (!rules.length) { list.innerHTML = '<p class="muted">Keine Programme gespeichert.</p>'; return; }
+  [...rules].sort((a, b) => ruleMinutes(a) - ruleMinutes(b)).forEach(r => {
+    const [yy, mm, dd, hh, mi] = r.datum;
+    const row = document.createElement("div");
+    row.className = "prog" + (r.aktiv ? "" : " paused");
+    const days = r.tage ? daysText(r.tage) : `einmalig am ${two(dd)}.${two(mm)}.${2000 + yy}`;
+    row.innerHTML = `
+      <span class="pill ${r.ein ? "on" : "off"}">${r.ein ? "EIN" : "AUS"}</span>
+      <div class="grow"><div class="when">${two(hh)}:${two(mi)}</div><div class="days">${days}${r.aktiv ? "" : " (pausiert)"}</div></div>
+      <button class="small ghost" data-act="toggle">${r.aktiv ? "Pause" : "Aktiv"}</button>
+      <button class="small ghost" data-act="del">Löschen</button>`;
+    row.querySelector('[data-act=toggle]').onclick = () => run(async () => {
+      await setRule(1, { ...r, aktiv: !r.aktiv }); await refresh();
+      show(r.aktiv ? "Programm pausiert." : "Programm wieder aktiv.");
+    });
+    row.querySelector('[data-act=del]').onclick = () => {
+      if (!confirm(`Programm ${r.ein ? "EIN" : "AUS"} um ${two(hh)}:${two(mi)} löschen?`)) return;
+      run(async () => { await setRule(2, r); await refresh(); show("Programm gelöscht."); });
+    };
+    list.appendChild(row);
+  });
+}
+
+async function refreshState() {
+  const s = await send(4);
+  if (s) { const on = s[4] === 1; $("state").textContent = on ? "EIN" : "AUS"; $("state").className = "state " + (on ? "on" : "off"); }
+}
+async function refresh() { rules = await readRules(); renderRules(); await refreshState(); }
+
+async function run(fn) {
+  if (busy) return; busy = true;
+  document.querySelectorAll("#app button").forEach(b => b.disabled = true);
+  try { await fn(); } catch (e) { show(e.message || String(e), "err", 7000); }
+  finally { busy = false; document.querySelectorAll("#app button").forEach(b => b.disabled = false); }
+}
+
+function setConnected(on) {
+  $("app").classList.toggle("hidden", !on);
+  $("connectCard").classList.toggle("hidden", on);
+  $("devname").textContent = on ? "Verbunden mit " + (device.name || "Clip-Clap") : "Nicht verbunden";
+}
+
+async function connect() {
+  if (!navigator.bluetooth) {
+    show("Dieser Browser kann kein Bluetooth. Bitte die Seite in Google Chrome öffnen.", "err", 0); return;
+  }
+  try {
+    device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }, { namePrefix: "CLIP" }], optionalServices: [SVC] });
+    device.addEventListener("gattserverdisconnected", () => { setConnected(false); show("Verbindung getrennt.", "info"); });
+    show("Verbinde ...", "info", 0);
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SVC);
+    chW = await svc.getCharacteristic(W);
+    const chN = await svc.getCharacteristic(N);
+    chN.addEventListener("characteristicvaluechanged", onNotify);
+    await chN.startNotifications();
+    await send(23, [0, ...PASSWORT.split("").map(Number), 0, 0, 0, 0]);
+    await setClock();
+    setConnected(true);
+    await run(refresh);
+    show("Verbunden. Uhrzeit wurde gestellt.");
+  } catch (e) {
+    if (e.name === "NotFoundError") show("Keine Uhr ausgewählt. Ist die Clip-Clap-App auf dem Handy geschlossen?", "err", 7000);
+    else show("Verbindung fehlgeschlagen: " + e.message, "err", 7000);
+  }
+}
+
+/* ---------- Formular ---------- */
+const form = { ein: true, week: true, tage: new Set(["Mo","Di","Mi","Do","Fr"]) };
+function segment(id, cb) {
+  $(id).querySelectorAll("button").forEach(b => b.onclick = () => {
+    $(id).querySelectorAll("button").forEach(x => x.classList.toggle("sel", x === b)); cb(b.dataset.v);
+  });
+}
+segment("segAction", v => form.ein = v === "1");
+segment("segRepeat", v => { form.week = v === "week"; $("weekBox").classList.toggle("hidden", !form.week); $("onceBox").classList.toggle("hidden", form.week); });
+function renderDays() {
+  $("days").innerHTML = "";
+  ANZEIGE.forEach(t => {
+    const b = document.createElement("button"); b.textContent = t; b.className = form.tage.has(t) ? "sel" : "";
+    b.onclick = () => { form.tage.has(t) ? form.tage.delete(t) : form.tage.add(t); renderDays(); };
+    $("days").appendChild(b);
+  });
+}
+document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => { form.tage = new Set(b.dataset.q.split(",")); renderDays(); });
+renderDays();
+$("date").valueAsDate = new Date();
+
+$("btnSave").onclick = () => run(async () => {
+  if (rules.length >= MAX) throw new Error("Die Uhr speichert höchstens 12 Programme. Bitte zuerst eines löschen.");
+  const [hh, mi] = $("time").value.split(":").map(Number);
+  if (isNaN(hh)) throw new Error("Bitte eine Uhrzeit wählen.");
+  let tage = 0, d = new Date();
+  if (form.week) {
+    if (!form.tage.size) throw new Error("Bitte mindestens einen Wochentag wählen.");
+    form.tage.forEach(t => tage |= 1 << TAGE.indexOf(t));
+  } else {
+    if (!$("date").value) throw new Error("Bitte ein Datum wählen.");
+    const [y, m, dd] = $("date").value.split("-").map(Number); d = new Date(y, m - 1, dd);
+  }
+  const used = new Set(rules.map(r => r.nr));
+  let nr = 1; while (used.has(nr)) nr++;
+  await setRule(0, { nr, aktiv: true, ein: form.ein, tage, datum: [d.getFullYear() - 2000, d.getMonth() + 1, d.getDate(), hh, mi] });
+  await refresh();
+  show(`Gespeichert: ${form.ein ? "Einschalten" : "Ausschalten"} um ${two(hh)}:${two(mi)}.`);
+});
+
+$("btnConnect").onclick = connect;
+$("btnOn").onclick = () => run(async () => { await send(3, [1, 0, 0]); await refreshState(); });
+$("btnOff").onclick = () => run(async () => { await send(3, [0, 0, 0]); await refreshState(); });
+$("btnTime").onclick = () => run(async () => { show((await setClock()) ? "Uhrzeit gestellt." : "Keine Bestätigung der Uhr.", "info"); });
+$("btnDisconnect").onclick = () => { if (device && device.gatt.connected) device.gatt.disconnect(); };
+</script>
+</body>
+</html>
