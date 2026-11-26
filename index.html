@@ -60,6 +60,13 @@
   button.small { min-height: 36px; padding: 6px 12px; font-size: 14px; border-radius: 11px; }
   button:disabled { opacity: .4; }
   .big { width: 100%; }
+  button.ghost { margin-top: 10px; background: transparent; color: var(--muted); border-color: var(--edge); }
+  .demo-bar { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 10px 12px 10px 16px; border-radius: 16px;
+    background: linear-gradient(135deg, rgba(139,123,255,.18), rgba(255,200,87,.10)); border: 1px solid rgba(139,123,255,.35);
+    font-size: 13px; color: var(--text); box-shadow: 0 0 30px -12px rgba(139,123,255,.8); }
+  .demo-bar b { font-family: var(--mono); letter-spacing: 3px; color: var(--amber); margin-right: 6px; }
+  .demo-bar span { flex: 1; }
+  body.demo .dot.live { background: var(--violet); box-shadow: 0 0 10px var(--violet); animation: none; }
 
   /* Verbinden */
   .hero-connect { text-align: center; padding: 34px 20px 26px; }
@@ -193,9 +200,14 @@
     <div class="orb"></div>
     <p>Bitte die alte Clip-Clap-App schliessen.<br>Die Uhr spricht immer nur mit einem Gerät.</p>
     <button class="cta big" id="btnConnect">Verbinden</button>
+    <button class="big ghost" id="btnDemo">Demo ansehen</button>
   </section>
 
   <div id="app" class="hidden">
+    <div class="demo-bar hidden" id="demoBar">
+      <span><b>DEMO</b>Alles nur gespielt. Es wird nichts geschaltet.</span>
+      <button class="small" id="btnDemoEnd">Beenden</button>
+    </div>
     <!-- Leistung -->
     <section class="card">
       <div class="power-head">
@@ -389,6 +401,7 @@ function onNotify(ev) {
 }
 // Befehle laufen nacheinander, damit sich Abfragen nicht in die Quere kommen.
 function send(cmd, payload, timeout = 3000) {
+  if (demo) return new Promise(r => setTimeout(() => r(demoReply(cmd, payload || [0, 0])), 90));
   const job = chain.then(() => new Promise(async res => {
     const w = { cmd, res };
     w.t = setTimeout(() => { waiters = waiters.filter(x => x !== w); res(null); }, timeout);
@@ -421,6 +434,86 @@ function setClock() {
   const t = new Date(), y = t.getFullYear();
   return send(1, [t.getSeconds(), t.getMinutes(), t.getHours(), t.getDate(), t.getMonth() + 1, y >> 8, y & 255, 0, 0]);
 }
+
+/* ---------- Demo-Uhr: antwortet wie die echte, schaltet aber nichts ---------- */
+let demo = null;
+function makeDemo() {
+  const t = new Date(), yy = t.getFullYear() - 2000, mo = t.getMonth() + 1, dd = t.getDate();
+  const r = (nr, ein, tage, hh, mi) => [nr, 1, ein, tage, yy, mo, dd, hh, mi];
+  return {
+    on: true, led: 1, cd: null, rnd: [0, 127, 18, 0, 23, 0], seed: 7,
+    rules: [r(1, 1, 60, 6, 30), r(2, 0, 60, 18, 20), r(3, 1, 2, 17, 50), r(4, 0, 2, 21, 0), r(5, 1, 1, 9, 0), r(6, 0, 1, 11, 0)]
+  };
+}
+function demoRand() { demo.seed = (demo.seed * 16807) % 2147483647; return demo.seed / 2147483647; }
+function demoReply(cmd, p) {
+  const out = data => { const f = frame(cmd, data); return Array.from(f); };
+  const now = new Date(), D = demo;
+  if (D.cd && D.cd.t <= now) { if (D.cd.mode) D.on = D.cd.mode === 1; D.cd = null; }
+  switch (cmd) {
+    case 3: D.on = p[0] === 1; return out([0]);
+    case 4: {   // Lampe um 60 Watt, leicht schwankend
+      const mw = D.on ? Math.round((60 + Math.sin(now / 1700) * 1.2 + (demoRand() - .5) * 0.8) * 1000) : 0;
+      return out([D.on ? 1 : 0, 0, mw >>> 24 & 255, mw >> 16 & 255, mw >> 8 & 255, mw & 255]);
+    }
+    case 20: {
+      const rec = D.rules.flatMap(x => [...x, 0, 0, 0]);
+      return out([D.rules.length, ...rec]);
+    }
+    case 19: {
+      const mode = p[0], rule = p.slice(1, 10), i = D.rules.findIndex(x => x[0] === rule[0]);
+      if (mode === 0) { if (D.rules.length >= MAX) return out([1]); rule[0] = Math.max(0, ...D.rules.map(x => x[0])) + 1; D.rules.push(rule); }
+      else if (i < 0) return out([1]);
+      else if (mode === 1) D.rules[i] = rule; else D.rules.splice(i, 1);
+      return out([0]);
+    }
+    case 10: case 11: {   // Verbrauch passend zu den Schaltzeiten, 60 Wh pro Stunde
+      const minutesOn = (day, a, b) => onSegments(day).segs.reduce((s, [x, y]) => s + Math.max(0, Math.min(b, y) - Math.max(a, x)), 0);
+      if (cmd === 10) {
+        const data = [];
+        for (let i = 0; i < 24; i++) {
+          const h = new Date(now); h.setMinutes(0, 0, 0); h.setHours(h.getHours() - 23 + i);
+          const day = new Date(h); day.setHours(0, 0, 0, 0);
+          let wh = Math.round(minutesOn(day, h.getHours() * 60, h.getHours() * 60 + 60) * (0.97 + demoRand() * 0.06));
+          if (i === 23) wh = Math.round(wh * now.getMinutes() / 60);
+          data.push(wh >> 8 & 255, wh & 255);
+        }
+        return out(data);
+      }
+      const data = [];
+      for (let i = 0; i < 30; i++) {
+        const day = new Date(now); day.setHours(0, 0, 0, 0); day.setDate(day.getDate() - 29 + i);
+        const end = i === 29 ? now.getHours() * 60 + now.getMinutes() : 1440;
+        const wh = Math.round(minutesOn(day, 0, end) * (0.95 + demoRand() * 0.1));
+        data.push(wh >>> 24 & 255, wh >> 16 & 255, wh >> 8 & 255, wh & 255);
+      }
+      return out(data);
+    }
+    case 8:
+      D.cd = p[0] ? { mode: p[0], t: new Date(2000 + p[6], p[5] - 1, p[4], p[3], p[2], p[1]) } : null;
+      return out([0]);
+    case 9: {
+      if (!D.cd) return out([0, 0, 0, 0, 0, 0, 0]);
+      const c = D.cd.t;
+      return out([D.cd.mode, c.getSeconds(), c.getMinutes(), c.getHours(), c.getDate(), c.getMonth() + 1, c.getFullYear() - 2000]);
+    }
+    case 21: D.rnd = p[0] ? p.slice(0, 6) : [0, 0, 0, 0, 0, 0]; return out([0]);
+    case 22: return out(D.rnd);
+    case 15: D.led = p[1]; return out([0]);
+    case 16: return out([D.led, 0]);
+    default: return out([0]);
+  }
+}
+async function startDemo(why) {
+  if (device && device.gatt.connected) device.gatt.disconnect();
+  demo = makeDemo();
+  document.body.classList.add("demo");
+  $("demoBar").classList.remove("hidden");
+  setConnected(true);
+  await run(loadAll);
+  show(why || "Demo-Modus gestartet. Probieren Sie alles aus.", "info", 5000);
+}
+function stopDemo() { setConnected(false); show("Demo beendet."); }
 
 /* ---------- Meldungen ---------- */
 function show(text, kind = "info", ms = 3200) {
@@ -723,16 +816,23 @@ function setConnected(on) {
   $("app").classList.toggle("hidden", !on);
   $("connectCard").classList.toggle("hidden", on);
   $("dot").classList.toggle("live", on);
-  $("devname").textContent = on ? (device.name || "Clip-Clap") : "offline";
+  $("devname").textContent = on ? (demo ? "Demo-Uhr" : (device.name || "Clip-Clap")) : "offline";
   clearInterval(pollTimer);
   if (on) pollTimer = setInterval(() => { if (!document.hidden && !busy) refreshState(); }, 2000);
-  else { clearInterval(cdTimer); waiters = []; chain = Promise.resolve(); document.body.classList.remove("on"); }
+  else {
+    clearInterval(cdTimer); waiters = []; chain = Promise.resolve(); document.body.classList.remove("on");
+    demo = null; document.body.classList.remove("demo"); $("demoBar").classList.add("hidden"); showWatt(0);
+  }
+}
+async function loadAll() {
+  await refreshState(); await refreshRules(); await loadEnergy();
+  await loadCountdown(); await loadRandom(); await loadConfig();
 }
 async function connect() {
-  if (!navigator.bluetooth) { show("Dieser Browser kann kein Bluetooth. Bitte die Seite in Google Chrome öffnen.", "err", 0); return; }
+  if (!navigator.bluetooth) { startDemo("Dieser Browser kann kein Bluetooth. Darum läuft jetzt der Demo-Modus."); return; }
   try {
     device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }, { namePrefix: "CLIP" }], optionalServices: [SVC] });
-    device.addEventListener("gattserverdisconnected", () => { setConnected(false); show("Verbindung getrennt."); });
+    device.addEventListener("gattserverdisconnected", () => { if (!demo) { setConnected(false); show("Verbindung getrennt."); } });
     show("Verbinde ...", "info", 0);
     const server = await device.gatt.connect();
     const svc = await server.getPrimaryService(SVC);
@@ -743,14 +843,13 @@ async function connect() {
     await send(23, [0, ...PASSWORT.split("").map(Number), 0, 0, 0, 0]);
     await setClock();
     setConnected(true);
-    await run(async () => {
-      await refreshState(); await refreshRules(); await loadEnergy();
-      await loadCountdown(); await loadRandom(); await loadConfig();
-    });
+    await run(loadAll);
     show("Verbunden. Uhrzeit wurde gestellt.");
   } catch (e) {
-    if (e.name === "NotFoundError") show("Keine Uhr ausgewählt. Ist die alte App geschlossen?", "err", 6000);
-    else show("Verbindung fehlgeschlagen: " + e.message, "err", 6000);
+    if (device && device.gatt.connected) device.gatt.disconnect();
+    startDemo(e.name === "NotFoundError"
+      ? "Keine Clip-Clap erreichbar. Darum läuft jetzt der Demo-Modus."
+      : "Verbindung fehlgeschlagen. Darum läuft jetzt der Demo-Modus.");
   }
 }
 
@@ -826,7 +925,11 @@ $("btnConnect").onclick = connect;
 $("btnOn").onclick = () => run(async () => { await send(3, [1, 0, 0]); await refreshState(); });
 $("btnOff").onclick = () => run(async () => { await send(3, [0, 0, 0]); await refreshState(); });
 $("btnTime").onclick = () => run(async () => { show((await setClock()) ? "Uhrzeit gestellt." : "Keine Bestätigung der Uhr."); });
-$("btnDisconnect").onclick = () => { if (device && device.gatt.connected) device.gatt.disconnect(); };
+$("btnDisconnect").onclick = () => { if (demo) stopDemo(); else if (device && device.gatt.connected) device.gatt.disconnect(); };
+$("btnDemo").onclick = () => startDemo();
+$("btnDemoEnd").onclick = stopDemo;
+// Link mit ?demo startet direkt den Demo-Modus, zum Beispiel zum Weitergeben an Freunde.
+if (/[?&]demo\b/.test(location.search)) startDemo();
 </script>
 </body>
 </html>
